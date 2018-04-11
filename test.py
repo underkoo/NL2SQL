@@ -54,7 +54,7 @@ if __name__ == '__main__':
     if args.baseline:
         model = Seq2SQL(word_emb, N_word=N_word, gpu=GPU, trainable_emb = True)
     else:
-        model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, filter_size=args.filter_size gpu=GPU,
+        model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, filter_size=args.filter_size, gpu=GPU,
                 trainable_emb = True)
 
     if args.train_emb:
