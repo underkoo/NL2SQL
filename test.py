@@ -22,6 +22,10 @@ if __name__ == '__main__':
             help='If set, then test Seq2SQL model; default is SQLNet model.')
     parser.add_argument('--train_emb', action='store_true',
             help='Use trained word embedding for SQLNet.')
+    parser.add_argument('--cnn', action='store_true',
+            help='Use cnn for predicting num of where clause')
+    parser.add_argument('--filter_size', type=int, default=1,
+            help='1: defulat filter size')
     args = parser.parse_args()
 
 
@@ -50,7 +54,7 @@ if __name__ == '__main__':
     if args.baseline:
         model = Seq2SQL(word_emb, N_word=N_word, gpu=GPU, trainable_emb = True)
     else:
-        model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, gpu=GPU,
+        model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, filter_size=args.filter_size gpu=GPU,
                 trainable_emb = True)
 
     if args.train_emb:
@@ -80,7 +84,11 @@ if __name__ == '__main__':
             model, BATCH_SIZE, val_sql_data, val_table_data, TEST_ENTRY))
     print ("Dev execution acc: %s"%epoch_exec_acc(
             model, BATCH_SIZE, val_sql_data, val_table_data, DEV_DB))
+    print ("Dev err num: %s;\n  breakdown on (agg, sel, where, agg_x_sel_o, agg_o_sel_x, cond_num, cond_col, cond_op, cond_val):\n %s"%epoch_error(
+            model, BATCH_SIZE, val_sql_data, val_table_data, TEST_ENTRY))
     print ("Test acc_qm: %s;\n  breakdown on (agg, sel, where): %s"%epoch_acc(
             model, BATCH_SIZE, test_sql_data, test_table_data, TEST_ENTRY))
     print ("Test execution acc: %s"%epoch_exec_acc(
             model, BATCH_SIZE, test_sql_data, test_table_data, TEST_DB))
+    print ("Test err num: %s;\n  breakdown on (agg, sel, where, agg_x_sel_o, agg_o_sel_x, cond_num, cond_col, cond_op, cond_val):\n %s"%epoch_error(
+            model, BATCH_SIZE, test_sql_data, test_table_data, TEST_ENTRY))

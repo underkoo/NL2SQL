@@ -218,6 +218,7 @@ class Seq2SQL(nn.Module):
         B = len(gt_queries)
 
         tot_err = agg_err = sel_err = cond_err = cond_num_err = \
+                  agg_o_sel_x = agg_x_sel_o = \
                   cond_col_err = cond_op_err = cond_val_err = 0.0
         agg_ops = ['None', 'MAX', 'MIN', 'COUNT', 'SUM', 'AVG']
         for b, (pred_qry, gt_qry) in enumerate(zip(pred_queries, gt_queries)):

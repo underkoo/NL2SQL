@@ -24,6 +24,10 @@ if __name__ == '__main__':
             help='If set, then train Seq2SQL model; default is SQLNet model.')
     parser.add_argument('--train_emb', action='store_true',
             help='Train word embedding for SQLNet(requires pretrained model).')
+    parser.add_argument('--cnn', action='store_true',
+            help='Use cnn for predicting num of where clause')
+    parser.add_argument('--filter_size', type=int, default=1,
+            help='1: defulat filter size')
     args = parser.parse_args()
 
     
@@ -56,8 +60,8 @@ if __name__ == '__main__':
                 trainable_emb = args.train_emb)
         assert not args.train_emb, "Seq2SQL can\'t train embedding."
     else:
-        model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca,
-                gpu=GPU, trainable_emb = args.train_emb)
+        model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn,
+                filter_size=args.filter_size, gpu=GPU, trainable_emb = args.train_emb)
         assert not args.rl, "SQLNet can\'t do reinforcement learning."
     optimizer = torch.optim.Adam(model.parameters(),
             lr=learning_rate, weight_decay = 0)
@@ -125,16 +129,21 @@ if __name__ == '__main__':
             if args.train_emb:
                 torch.save(model.cond_embed_layer.state_dict(), cond_e)
         for i in range(100):
+        # for i in range(1):
             print ('Epoch %d @ %s'%(i+1, datetime.datetime.now()))
             print (' Loss = %s'%epoch_train(
                     model, optimizer, BATCH_SIZE, 
                     sql_data, table_data, TRAIN_ENTRY))
             print (' Train acc_qm: %s\n   breakdown result: %s'%epoch_acc(
                     model, BATCH_SIZE, sql_data, table_data, TRAIN_ENTRY))
+            print (' Train err num: %s;\n  breakdown on (agg, sel, where, agg_x_sel_o, agg_o_sel_x, cond_num, cond_col, cond_op, cond_val):\n %s'%epoch_error(
+            model, BATCH_SIZE, sql_data, table_data, TRAIN_ENTRY))
             #val_acc = epoch_token_acc(model, BATCH_SIZE, val_sql_data, val_table_data, TRAIN_ENTRY)
             val_acc = epoch_acc(model,
                     BATCH_SIZE, val_sql_data, val_table_data, TRAIN_ENTRY)
             print (' Dev acc_qm: %s\n   breakdown result: %s'%val_acc)
+            print (' Dev err num: %s;\n  breakdown on (agg, sel, where, agg_x_sel_o, agg_o_sel_x, cond_num, cond_col, cond_op, cond_val):\n %s'%epoch_error(
+            model, BATCH_SIZE, val_sql_data, val_table_data, TRAIN_ENTRY))
             if TRAIN_AGG:
                 if val_acc[1][0] > best_agg_acc:
                     best_agg_acc = val_acc[1][0]

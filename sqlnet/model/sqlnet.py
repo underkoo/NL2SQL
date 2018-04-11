@@ -12,9 +12,11 @@ from sqlnet.model.modules.sqlnet_condition_predict import SQLNetCondPredictor
 
 class SQLNet(nn.Module):
     def __init__(self, word_emb, N_word, N_h=100, N_depth=2,
-            gpu=False, use_ca=True, trainable_emb=False):
+            gpu=False, use_ca=True, use_cnn=False, filter_size=1, trainable_emb=False):
         super(SQLNet, self).__init__()
         self.use_ca = use_ca
+        self.use_cnn = use_cnn
+        self.filter_size = filter_size
         self.trainable_emb = trainable_emb
 
         self.gpu = gpu
@@ -40,7 +42,7 @@ class SQLNet(nn.Module):
                     self.SQL_TOK, our_model=True, trainable=trainable_emb)
         
         #Predict aggregator
-        self.agg_pred = AggPredictor(N_word, N_h, N_depth, use_ca=use_ca)
+        self.agg_pred = AggPredictor(N_word, N_h, N_depth, use_ca=use_ca, use_cnn=use_cnn, filter_size=filter_size)
 
         #Predict selected column
         self.sel_pred = SelPredictor(N_word, N_h, N_depth,
@@ -48,7 +50,7 @@ class SQLNet(nn.Module):
 
         #Predict number of cond
         self.cond_pred = SQLNetCondPredictor(N_word, N_h, N_depth,
-                self.max_col_num, self.max_tok_num, use_ca, gpu)
+                self.max_col_num, self.max_tok_num, use_ca, use_cnn, filter_size, gpu)
 
 
         self.CE = nn.CrossEntropyLoss()
@@ -251,6 +253,7 @@ class SQLNet(nn.Module):
         tot_err = agg_err = sel_err = cond_err = 0.0
         cond_num_err = cond_col_err = cond_op_err = cond_val_err = 0.0
         agg_ops = ['None', 'MAX', 'MIN', 'COUNT', 'SUM', 'AVG']
+
         for b, (pred_qry, gt_qry) in enumerate(zip(pred_queries, gt_queries)):
             good = True
             if pred_agg:
@@ -307,6 +310,94 @@ class SQLNet(nn.Module):
                 tot_err += 1
 
         return np.array((agg_err, sel_err, cond_err)), tot_err
+
+    def check_error(self, vis_info, pred_queries, gt_queries, pred_entry):
+        def pretty_print(vis_data):
+            print ('question:', vis_data[0])
+            print ('headers: (%s)'%(' || '.join(vis_data[1])))
+            print ('query:', vis_data[2])
+
+        def gen_cond_str(conds, header):
+            if len(conds) == 0:
+                return 'None'
+            cond_str = []
+            for cond in conds:
+                cond_str.append(header[cond[0]] + ' ' +
+                    self.COND_OPS[cond[1]] + ' ' + str(cond[2]).lower())
+            return 'WHERE ' + ' AND '.join(cond_str)
+
+        pred_agg, pred_sel, pred_cond = pred_entry
+
+        B = len(gt_queries)
+
+        tot_err = agg_err = sel_err = cond_err = 0.0
+        agg_o_sel_x = agg_x_sel_o = 0.0
+        cond_num_err = cond_col_err = cond_op_err = cond_val_err = 0.0
+        agg_ops = ['None', 'MAX', 'MIN', 'COUNT', 'SUM', 'AVG']
+
+        for b, (pred_qry, gt_qry) in enumerate(zip(pred_queries, gt_queries)):
+            good = True
+            agg_pred = pred_qry['agg']
+            agg_gt = gt_qry['agg']
+            sel_pred = pred_qry['sel']
+            sel_gt = gt_qry['sel']
+
+            if agg_pred != agg_gt and sel_pred == sel_gt:
+                agg_x_sel_o += 1
+
+            if agg_pred == agg_gt and sel_pred != sel_gt:
+                agg_o_sel_x += 1
+
+            if pred_agg:
+                if agg_pred != agg_gt:
+                    agg_err += 1
+                    good = False
+
+            if pred_sel:
+                if sel_pred != sel_gt:
+                    sel_err += 1
+                    good = False
+
+            if pred_cond:
+                cond_pred = pred_qry['conds']
+                cond_gt = gt_qry['conds']
+                flag = True
+                if len(cond_pred) != len(cond_gt):
+                    flag = False
+                    cond_num_err += 1
+
+                if flag and set(x[0] for x in cond_pred) != \
+                        set(x[0] for x in cond_gt):
+                    flag = False
+                    cond_col_err += 1
+
+                for idx in range(len(cond_pred)):
+                    if not flag:
+                        break
+                    gt_idx = tuple(
+                            x[0] for x in cond_gt).index(cond_pred[idx][0])
+                    if flag and cond_gt[gt_idx][1] != cond_pred[idx][1]:
+                        flag = False
+                        cond_op_err += 1
+
+                for idx in range(len(cond_pred)):
+                    if not flag:
+                        break
+                    gt_idx = tuple(
+                            x[0] for x in cond_gt).index(cond_pred[idx][0])
+                    if flag and str(cond_gt[gt_idx][2]).lower() != \
+                            str(cond_pred[idx][2]).lower():
+                        flag = False
+                        cond_val_err += 1
+
+                if not flag:
+                    cond_err += 1
+                    good = False
+
+            if not good:
+                tot_err += 1
+
+        return np.array((agg_err, sel_err, cond_err, agg_x_sel_o, agg_o_sel_x, cond_num_err, cond_col_err, cond_op_err, cond_val_err)), tot_err
 
 
     def gen_query(self, score, q, col, raw_q, raw_col,

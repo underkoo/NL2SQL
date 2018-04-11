@@ -17,6 +17,7 @@ def load_data(sql_paths, table_paths, use_small=False):
         print ("Loading data from %s"%SQL_PATH)
         with open(SQL_PATH) as inf:
             for idx, line in enumerate(inf):
+                # if use_small and idx >= 2:
                 if use_small and idx >= 1000:
                     break
                 sql = json.loads(line.strip())
@@ -102,15 +103,21 @@ def to_batch_seq(sql_data, table_data, idxes, st, ed, ret_vis_data=False):
     vis_seq = []
     for i in range(st, ed):
         sql = sql_data[idxes[i]]
+        # question token 단위로 자른거
         q_seq.append(sql['question_tok'])
+        # 이 쿼리의 테이블 데이터의 column의 sequence[][]
         col_seq.append(table_data[sql['table_id']]['header_tok'])
+        # 이 쿼리의 테이블 데이터의 column 개수
         col_num.append(len(table_data[sql['table_id']]['header']))
+        # 정답 쿼리 : agg, sel할 column, cond 개수, 각 cond별 column과 op
         ans_seq.append((sql['sql']['agg'],
             sql['sql']['sel'], 
             len(sql['sql']['conds']),
             tuple(x[0] for x in sql['sql']['conds']),
             tuple(x[1] for x in sql['sql']['conds'])))
+        # 정답 쿼리 token 단위로 자른거
         query_seq.append(sql['query_tok'])
+        # 그냥 정답 쿼리의 cond seq. [[column, op, value]]로 되있음.
         gt_cond_seq.append(sql['sql']['conds'])
         vis_seq.append((sql['question'],
             table_data[sql['table_id']]['header'], sql['query']))
@@ -134,11 +141,18 @@ def epoch_train(model, optimizer, batch_size, sql_data, table_data, pred_entry):
     st = 0
     while st < len(sql_data):
         ed = st+batch_size if st+batch_size < len(perm) else len(perm)
-
         q_seq, col_seq, col_num, ans_seq, query_seq, gt_cond_seq = \
                 to_batch_seq(sql_data, table_data, perm, st, ed)
+        # if ed == 15:
+        #     print(q_seq[0])
+        #     print(col_seq[0])
+        #     print(col_num[0])
+        #     print(ans_seq[0])
+        #     print(query_seq[0])
+        #     print(gt_cond_seq[0])
         gt_where_seq = model.generate_gt_where_seq(q_seq, col_seq, query_seq)
         gt_sel_seq = [x[1] for x in ans_seq]
+
         score = model.forward(q_seq, col_seq, col_num, pred_entry,
                 gt_where=gt_where_seq, gt_cond=gt_cond_seq, gt_sel=gt_sel_seq)
         loss = model.loss(score, ans_seq, pred_entry, gt_where_seq)
@@ -214,6 +228,33 @@ def epoch_acc(model, batch_size, sql_data, table_data, pred_entry):
 
         st = ed
     return tot_acc_num / len(sql_data), one_acc_num / len(sql_data)
+
+def epoch_error(model, batch_size, sql_data, table_data, pred_entry):
+    model.eval()
+    perm = list(range(len(sql_data)))
+    st = 0
+    one_err_num = 0.0
+    tot_err_num = 0.0
+    while st < len(sql_data):
+        ed = st+batch_size if st+batch_size < len(perm) else len(perm)
+
+        q_seq, col_seq, col_num, ans_seq, query_seq, gt_cond_seq, raw_data = to_batch_seq(sql_data, table_data, perm, st, ed, ret_vis_data=True)
+        raw_q_seq = [x[0] for x in raw_data]
+        raw_col_seq = [x[1] for x in raw_data]
+        query_gt, table_ids = to_batch_query(sql_data, perm, st, ed)
+        gt_sel_seq = [x[1] for x in ans_seq]
+        score = model.forward(q_seq, col_seq, col_num,
+                pred_entry, gt_sel = gt_sel_seq)
+        pred_queries = model.gen_query(score, q_seq, col_seq,
+                raw_q_seq, raw_col_seq, pred_entry)
+        one_err, tot_err = model.check_error(raw_data,
+                pred_queries, query_gt, pred_entry)
+
+        one_err_num += one_err
+        tot_err_num += tot_err
+
+        st = ed
+    return tot_err_num, one_err_num
 
 def epoch_reinforce_train(model, optimizer, batch_size, sql_data, table_data, db_path):
     engine = DBEngine(db_path)
