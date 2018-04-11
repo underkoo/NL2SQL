@@ -128,13 +128,13 @@ if __name__ == '__main__':
             torch.save(model.cond_pred.state_dict(), cond_m)
             if args.train_emb:
                 torch.save(model.cond_embed_layer.state_dict(), cond_e)
-        for i in range(100):
+        for i in range(101):
         # for i in range(1):
             print ('Epoch %d @ %s'%(i+1, datetime.datetime.now()))
             print (' Loss = %s'%epoch_train(
                     model, optimizer, BATCH_SIZE, 
                     sql_data, table_data, TRAIN_ENTRY))
-            if i % 10 == 1:
+            if i % 10 == 0:
                 print (' Train err num: %s;\n  breakdown on (agg, sel, where, agg_x_sel_o, agg_o_sel_x, cond_num, cond_col, cond_op, cond_val):\n %s'%epoch_error(
                 model, BATCH_SIZE, sql_data, table_data, TRAIN_ENTRY))
                 print (' Train acc_qm: %s\n   breakdown result: %s'%epoch_acc(
