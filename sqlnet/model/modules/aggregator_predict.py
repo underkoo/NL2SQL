@@ -18,7 +18,7 @@ class AggPredictor(nn.Module):
             self.agg_conv1 = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
                     in_channels=1,
-                    out_channels=self.filter_size*4,
+                    out_channels=self.filter_size,
                     kernel_size= (3, 1),
                     stride= (1, 1),
                     padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
@@ -28,8 +28,8 @@ class AggPredictor(nn.Module):
             )
             self.agg_conv2 = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
-                    in_channels=self.filter_size*4,
-                    out_channels=self.filter_size*8,
+                    in_channels=self.filter_size,
+                    out_channels=self.filter_size*2,
                     kernel_size= (3, 1),
                     stride= (1, 1),
                     padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
@@ -39,8 +39,8 @@ class AggPredictor(nn.Module):
             )
             self.agg_conv_last = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
-                    in_channels=self.filter_size*8,
-                    out_channels=self.filter_size*16,
+                    in_channels=self.filter_size*2,
+                    out_channels=self.filter_size*4,
                     kernel_size= (3, 1),
                     stride= (1, 1),
                     padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
@@ -49,10 +49,10 @@ class AggPredictor(nn.Module):
                 nn.AdaptiveMaxPool2d((8, N_word)),    # choose max value in 2x2 area, output shape (16, 14, 14)
             )
             self.agg_fc = nn.Sequential( # fully connected layer  
-                nn.Linear(self.filter_size*16 * 8 * N_word, int(self.filter_size*16 * 8 * N_word / 2)),
+                nn.Linear(self.filter_size*4 * 8 * N_word, int(self.filter_size*4 * 8 * N_word / 2)),
                 nn.ReLU()                      # activation
             )
-            self.agg_fc_out = nn.Linear(int(self.filter_size*16 * 8 * N_word / 2), 6)
+            self.agg_fc_out = nn.Linear(int(self.filter_size*4 * 8 * N_word / 2), 6)
 
         else:
             self.agg_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),

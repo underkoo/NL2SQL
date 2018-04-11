@@ -22,7 +22,7 @@ class SQLNetCondPredictor(nn.Module):
             self.cond_num_conv1 = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
                     in_channels=1,
-                    out_channels=self.filter_size*4,
+                    out_channels=self.filter_size,
                     kernel_size= (3, 1),
                     stride= (1, 1),
                     padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
@@ -32,8 +32,8 @@ class SQLNetCondPredictor(nn.Module):
             )
             self.cond_num_conv2 = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
-                    in_channels=self.filter_size*4,
-                    out_channels=self.filter_size*8,
+                    in_channels=self.filter_size,
+                    out_channels=self.filter_size*2,
                     kernel_size= (3, 1),
                     stride= (1, 1),
                     padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
@@ -43,8 +43,8 @@ class SQLNetCondPredictor(nn.Module):
             )
             self.cond_num_conv_last = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
-                    in_channels=self.filter_size*8,
-                    out_channels=self.filter_size*16,
+                    in_channels=self.filter_size*2,
+                    out_channels=self.filter_size*4,
                     kernel_size= (3, 1),
                     stride= (1, 1),
                     padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
@@ -53,10 +53,10 @@ class SQLNetCondPredictor(nn.Module):
                 nn.AdaptiveMaxPool2d((8, N_word)),    # choose max value in 2x2 area, output shape (16, 14, 14)
             )
             self.cond_num_fc = nn.Sequential( # fully connected layer  
-                nn.Linear(self.filter_size*16 * 8 * N_word, int(self.filter_size*16 * 8 * N_word / 2)),
+                nn.Linear(self.filter_size*4 * 8 * N_word, int(self.filter_size*4 * 8 * N_word / 2)),
                 nn.ReLU()                      # activation
             )
-            self.cond_num_fc_out = nn.Linear(int(self.filter_size*16 * 8 * N_word / 2), 5)
+            self.cond_num_fc_out = nn.Linear(int(self.filter_size*4 * 8 * N_word / 2), 5)
         else:
             self.cond_num_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
                     num_layers=N_depth, batch_first=True,
