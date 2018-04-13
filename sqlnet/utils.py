@@ -17,7 +17,7 @@ def load_data(sql_paths, table_paths, use_small=False):
         print ("Loading data from %s"%SQL_PATH)
         with open(SQL_PATH) as inf:
             for idx, line in enumerate(inf):
-                # if use_small and idx >= 1:
+                # if use_small and idx >= 2:
                 if use_small and idx >= 1000:
                     break
                 sql = json.loads(line.strip())

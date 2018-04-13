@@ -17,24 +17,20 @@ class SQLNetCondPredictor(nn.Module):
         self.use_cnn = use_cnn
         self.filter_size = filter_size
 
-        if self.use_cnn:
+        if use_cnn:
             self.cond_num_conv = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
                     in_channels=1,
                     out_channels=self.filter_size,
-                    kernel_size= (3, 100),
-                    stride= (2, 1),
-                    padding= (2, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
+                    kernel_size= (7, 100),
+                    stride= (1, 1),
+                    padding= (3, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
                 ),
                 nn.BatchNorm2d(self.filter_size),
                 nn.ReLU(),
                 nn.AdaptiveMaxPool2d((6, 1))
             )
-            self.cond_num_fc = nn.Sequential( # fully connected layer  
-                nn.Linear(self.filter_size * 6 * 1, 5),
-                nn.Dropout2d(p=0.3),
-                nn.ReLU()                      # activation
-            )
+            self.cond_num_fc = nn.Linear(self.filter_size * 6 * 1, 5)
         else:
 
             self.cond_num_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
@@ -50,7 +46,24 @@ class SQLNetCondPredictor(nn.Module):
             self.cond_num_col2hid1 = nn.Linear(N_h, 2*N_h)
             self.cond_num_col2hid2 = nn.Linear(N_h, 2*N_h)
 
-
+        # if use_cnn:
+        #     self.cond_col_conv = nn.Sequential(         # input shape (1, 28, 28)
+        #         nn.Conv2d(
+        #             in_channels=1,
+        #             out_channels=self.filter_size,
+        #             kernel_size= (7, 100),
+        #             stride= (2, 1),
+        #             padding= (2, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
+        #         ),
+        #         nn.BatchNorm2d(self.filter_size),
+        #         nn.ReLU(),
+        #         nn.AdaptiveMaxPool2d((10, 1))
+        #     )
+        #     self.cond_col_relu = nn.Sequential( # fully connected layer  
+        #         nn.Dropout2d(p=0.3),
+        #         nn.ReLU()                      # activation
+        #     )
+        # else:
         self.cond_col_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
                 num_layers=N_depth, batch_first=True,
                 dropout=0.3, bidirectional=True)
@@ -140,8 +153,8 @@ class SQLNetCondPredictor(nn.Module):
 
         
         if self.use_cnn:
-            x_emb_var_dim = torch.unsqueeze(x_emb_var, dim=1)
-            cond_num_conv_h = self.cond_num_conv(x_emb_var_dim)
+            x_emb_var_num_dim = torch.unsqueeze(x_emb_var, dim=1)
+            cond_num_conv_h = self.cond_num_conv(x_emb_var_num_dim)
             cond_num_conv_h_dim = cond_num_conv_h.view(cond_num_conv_h.size(0), -1)
             cond_num_score = self.cond_num_fc(cond_num_conv_h_dim)
         else:
@@ -173,10 +186,21 @@ class SQLNetCondPredictor(nn.Module):
             cond_num_score = self.cond_num_out(K_cond_num)
 
         #Predict the columns of conditions
+
+        # if self.use_cnn:
+        #     x_emb_var_col_dim = torch.unsqueeze(x_emb_var, dim=1)
+        #     cond_col_conv_h = self.cond_col_conv(x_emb_var_col_dim)
+        #     cond_col_conv_h_dim = cond_col_conv_h.view(cond_col_conv_h.size(0), -1)
+        #     print(cond_col_conv_h_dim)
+        #     cond_col_conv_h_resize = nn.Linear(cond_col_conv_h_dim, col_len)
+        #     print(cond_col_conv_h_resize)
+        #     cond_col_score = self.cond_col_dr(cond_col_conv_h_resize)
+        # else:
         e_cond_col, _ = col_name_encode(col_inp_var, col_name_len, col_len,
                 self.cond_col_name_enc)
 
         h_col_enc, _ = run_lstm(self.cond_col_lstm, x_emb_var, x_len)
+        # print('h_col_enc : ',h_col_enc)
         if self.use_ca:
             col_att_val = torch.bmm(e_cond_col,
                     self.cond_col_att(h_col_enc).transpose(1, 2))
@@ -194,7 +218,13 @@ class SQLNetCondPredictor(nn.Module):
             col_att = self.softmax(col_att_val)
             K_cond_col = (h_col_enc *
                     col_att_val.unsqueeze(2)).sum(1).unsqueeze(1)
-
+        # print('K_cond_col : ', K_cond_col)
+        # print('e_cond_col : ', e_cond_col)
+        # print('e_cond_col_size : ', e_cond_col.size(1))
+        # print('cond_col_out_K : ', self.cond_col_out_K(K_cond_col))
+        # print('cond_col_out_col : ',self.cond_col_out_col(e_cond_col))
+        # print('by adding', self.cond_col_out_K(K_cond_col) + self.cond_col_out_col(e_cond_col))
+        # print('cond_col_out : ', self.cond_col_out(self.cond_col_out_K(K_cond_col) + self.cond_col_out_col(e_cond_col)))
         cond_col_score = self.cond_col_out(self.cond_col_out_K(K_cond_col) +
                 self.cond_col_out_col(e_cond_col)).squeeze()
         max_col_num = max(col_num)

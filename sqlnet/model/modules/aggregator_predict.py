@@ -14,24 +14,20 @@ class AggPredictor(nn.Module):
         self.use_ca = use_ca
         self.use_cnn = use_cnn
         self.filter_size = filter_size
-        if self.use_cnn:
+        if use_cnn:
             self.agg_conv = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
                     in_channels=1,
                     out_channels=self.filter_size,
-                    kernel_size= (3, 100),
-                    stride= (2, 1),
-                    padding= (2, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
+                    kernel_size= (7, 100),
+                    stride= (1, 1),
+                    padding= (3, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
                 ),
                 nn.BatchNorm2d(self.filter_size),
                 nn.ReLU(),
                 nn.AdaptiveMaxPool2d((6, 1))
             )
-            self.agg_fc = nn.Sequential( # fully connected layer  
-                nn.Linear(self.filter_size * 6 * 1, 6),
-                nn.Dropout2d(p=0.3),
-                nn.ReLU()                      # activation
-            )
+            self.agg_fc = nn.Linear(self.filter_size * 6 * 1, 6)
         else:
             self.agg_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
                     num_layers=N_depth, batch_first=True,
