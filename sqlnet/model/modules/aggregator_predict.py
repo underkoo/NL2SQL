@@ -15,45 +15,23 @@ class AggPredictor(nn.Module):
         self.use_cnn = use_cnn
         self.filter_size = filter_size
         if self.use_cnn:
-            self.agg_conv1 = nn.Sequential(         # input shape (1, 28, 28)
+            self.agg_conv = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
                     in_channels=1,
                     out_channels=self.filter_size,
-                    kernel_size= (3, 1),
-                    stride= (1, 1),
-                    padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
-                ),                              # output shape (16, 28, 28)
-                nn.ReLU(),                      # activation
-                nn.MaxPool2d(kernel_size= (2, 1)),    # choose max value in 2x2 area, output shape (16, 14, 14)
-            )
-            self.agg_conv2 = nn.Sequential(         # input shape (1, 28, 28)
-                nn.Conv2d(
-                    in_channels=self.filter_size,
-                    out_channels=self.filter_size*2,
-                    kernel_size= (3, 1),
-                    stride= (1, 1),
-                    padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
-                ),                              # output shape (16, 28, 28)
-                nn.ReLU(),                      # activation
-                nn.MaxPool2d(kernel_size= (2, 1)),    # choose max value in 2x2 area, output shape (16, 14, 14)
-            )
-            self.agg_conv_last = nn.Sequential(         # input shape (1, 28, 28)
-                nn.Conv2d(
-                    in_channels=self.filter_size*2,
-                    out_channels=self.filter_size*4,
-                    kernel_size= (3, 1),
-                    stride= (1, 1),
-                    padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
-                ),                              # output shape (16, 28, 28)
-                nn.ReLU(),                      # activation
-                nn.AdaptiveMaxPool2d((8, N_word)),    # choose max value in 2x2 area, output shape (16, 14, 14)
+                    kernel_size= (3, 100),
+                    stride= (2, 1),
+                    padding= (2, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
+                ),
+                nn.BatchNorm2d(self.filter_size),
+                nn.ReLU(),
+                nn.AdaptiveMaxPool2d((6, 1))
             )
             self.agg_fc = nn.Sequential( # fully connected layer  
-                nn.Linear(self.filter_size*4 * 8 * N_word, int(self.filter_size*4 * 8 * N_word / 2)),
+                nn.Linear(self.filter_size * 6 * 1, 6),
+                nn.Dropout2d(p=0.3),
                 nn.ReLU()                      # activation
             )
-            self.agg_fc_out = nn.Linear(int(self.filter_size*4 * 8 * N_word / 2), 6)
-
         else:
             self.agg_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
                     num_layers=N_depth, batch_first=True,
@@ -75,12 +53,13 @@ class AggPredictor(nn.Module):
             col_len=None, col_num=None, gt_sel=None):
         if self.use_cnn:
             x_emb_var_dim = torch.unsqueeze(x_emb_var, dim=1)
-            agg_conv1 = self.agg_conv1(x_emb_var_dim)
-            agg_conv2 = self.agg_conv2(agg_conv1)
-            agg_conv_last = self.agg_conv_last(agg_conv2)
-            agg_h_conv = agg_conv_last.view(agg_conv_last.size(0), -1)
-            agg_h_conv_fc = self.agg_fc(agg_h_conv)
-            agg_score = self.agg_fc_out(agg_h_conv_fc)
+            # print(x_emb_var_dim)
+            agg_conv_h = self.agg_conv(x_emb_var_dim)
+            # print(agg_conv_h)
+            agg_conv_h_dim = agg_conv_h.view(agg_conv_h.size(0), -1)
+            # print(agg_conv_h_dim)
+            agg_score = self.agg_fc(agg_conv_h_dim)
+            # print(agg_score)
         else:
             B = len(x_emb_var)
             max_x_len = max(x_len)

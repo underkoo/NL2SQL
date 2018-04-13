@@ -18,46 +18,25 @@ class SQLNetCondPredictor(nn.Module):
         self.filter_size = filter_size
 
         if self.use_cnn:
-
-            self.cond_num_conv1 = nn.Sequential(         # input shape (1, 28, 28)
+            self.cond_num_conv = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
                     in_channels=1,
                     out_channels=self.filter_size,
-                    kernel_size= (3, 1),
-                    stride= (1, 1),
-                    padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
-                ),                              # output shape (16, 28, 28)
-                nn.ReLU(),                      # activation
-                nn.MaxPool2d(kernel_size= (2, 1)),    # choose max value in 2x2 area, output shape (16, 14, 14)
-            )
-            self.cond_num_conv2 = nn.Sequential(         # input shape (1, 28, 28)
-                nn.Conv2d(
-                    in_channels=self.filter_size,
-                    out_channels=self.filter_size*2,
-                    kernel_size= (3, 1),
-                    stride= (1, 1),
-                    padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
-                ),                              # output shape (16, 28, 28)
-                nn.ReLU(),                      # activation
-                nn.MaxPool2d(kernel_size= (2, 1)),    # choose max value in 2x2 area, output shape (16, 14, 14)
-            )
-            self.cond_num_conv_last = nn.Sequential(         # input shape (1, 28, 28)
-                nn.Conv2d(
-                    in_channels=self.filter_size*2,
-                    out_channels=self.filter_size*4,
-                    kernel_size= (3, 1),
-                    stride= (1, 1),
-                    padding= (1, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
-                ),                              # output shape (16, 28, 28)
-                nn.ReLU(),                      # activation
-                nn.AdaptiveMaxPool2d((8, N_word)),    # choose max value in 2x2 area, output shape (16, 14, 14)
+                    kernel_size= (3, 100),
+                    stride= (2, 1),
+                    padding= (2, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
+                ),
+                nn.BatchNorm2d(self.filter_size),
+                nn.ReLU(),
+                nn.AdaptiveMaxPool2d((6, 1))
             )
             self.cond_num_fc = nn.Sequential( # fully connected layer  
-                nn.Linear(self.filter_size*4 * 8 * N_word, int(self.filter_size*4 * 8 * N_word / 2)),
+                nn.Linear(self.filter_size * 6 * 1, 5),
+                nn.Dropout2d(p=0.3),
                 nn.ReLU()                      # activation
             )
-            self.cond_num_fc_out = nn.Linear(int(self.filter_size*4 * 8 * N_word / 2), 5)
         else:
+
             self.cond_num_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
                     num_layers=N_depth, batch_first=True,
                     dropout=0.3, bidirectional=True)
@@ -70,6 +49,8 @@ class SQLNetCondPredictor(nn.Module):
             self.cond_num_col_att = nn.Linear(N_h, 1)
             self.cond_num_col2hid1 = nn.Linear(N_h, 2*N_h)
             self.cond_num_col2hid2 = nn.Linear(N_h, 2*N_h)
+
+
         self.cond_col_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
                 num_layers=N_depth, batch_first=True,
                 dropout=0.3, bidirectional=True)
@@ -160,12 +141,9 @@ class SQLNetCondPredictor(nn.Module):
         
         if self.use_cnn:
             x_emb_var_dim = torch.unsqueeze(x_emb_var, dim=1)
-            x_conv1 = self.cond_num_conv1(x_emb_var_dim)
-            x_conv2 = self.cond_num_conv2(x_conv1)
-            x_conv_last = self.cond_num_conv_last(x_conv2)
-            h_conv = x_conv_last.view(x_conv_last.size(0), -1)
-            h_conv_fc = self.cond_num_fc(h_conv)
-            cond_num_score = self.cond_num_fc_out(h_conv_fc)
+            cond_num_conv_h = self.cond_num_conv(x_emb_var_dim)
+            cond_num_conv_h_dim = cond_num_conv_h.view(cond_num_conv_h.size(0), -1)
+            cond_num_score = self.cond_num_fc(cond_num_conv_h_dim)
         else:
             e_num_col, col_num = col_name_encode(col_inp_var, col_name_len,
                     col_len, self.cond_num_name_enc)
