@@ -24,7 +24,7 @@ if __name__ == '__main__':
             help='Use trained word embedding for SQLNet.')
     parser.add_argument('--cnn', action='store_true',
             help='Use cnn for predicting num of where clause')
-    parser.add_argument('--filter_size', type=int, default=1,
+    parser.add_argument('--filter_num', type=int, default=1,
             help='1: defulat filter size')
     args = parser.parse_args()
 
@@ -54,7 +54,7 @@ if __name__ == '__main__':
     if args.baseline:
         model = Seq2SQL(word_emb, N_word=N_word, gpu=GPU, trainable_emb = True)
     else:
-        model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, filter_size=args.filter_size, gpu=GPU,
+        model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, filter_num=args.filter_num, gpu=GPU,
                 trainable_emb = True)
 
     if args.train_emb:

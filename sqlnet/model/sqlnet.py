@@ -11,12 +11,12 @@ from sqlnet.model.modules.sqlnet_condition_predict import SQLNetCondPredictor
 
 
 class SQLNet(nn.Module):
-    def __init__(self, word_emb, N_word, N_h=100, N_depth=2,
-            gpu=False, use_ca=True, use_cnn=False, filter_size=1, trainable_emb=False):
+    def __init__(self, word_emb, N_word, N_h=200, N_depth=2,
+            gpu=False, use_ca=True, use_cnn=False, filter_num=1, trainable_emb=False):
         super(SQLNet, self).__init__()
         self.use_ca = use_ca
         self.use_cnn = use_cnn
-        self.filter_size = filter_size
+        self.filter_num = filter_num
         self.trainable_emb = trainable_emb
 
         self.gpu = gpu
@@ -42,7 +42,7 @@ class SQLNet(nn.Module):
                     self.SQL_TOK, our_model=True, trainable=trainable_emb)
         
         #Predict aggregator
-        self.agg_pred = AggPredictor(N_word, N_h, N_depth, use_ca=use_ca, use_cnn=use_cnn, filter_size=filter_size)
+        self.agg_pred = AggPredictor(N_word, N_h, N_depth, use_ca=use_ca, use_cnn=use_cnn, filter_num=filter_num)
 
         #Predict selected column
         self.sel_pred = SelPredictor(N_word, N_h, N_depth,
@@ -50,7 +50,7 @@ class SQLNet(nn.Module):
 
         #Predict number of cond
         self.cond_pred = SQLNetCondPredictor(N_word, N_h, N_depth,
-                self.max_col_num, self.max_tok_num, use_ca, use_cnn, filter_size, gpu)
+                self.max_col_num, self.max_tok_num, use_ca, use_cnn, filter_num, gpu)
 
 
         self.CE = nn.CrossEntropyLoss()

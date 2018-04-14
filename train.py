@@ -26,7 +26,7 @@ if __name__ == '__main__':
             help='Train word embedding for SQLNet(requires pretrained model).')
     parser.add_argument('--cnn', action='store_true',
             help='Use cnn for predicting num of where clause')
-    parser.add_argument('--filter_size', type=int, default=1,
+    parser.add_argument('--filter_num', type=int, default=1,
             help='1: defulat filter size')
     args = parser.parse_args()
 
@@ -61,7 +61,7 @@ if __name__ == '__main__':
         assert not args.train_emb, "Seq2SQL can\'t train embedding."
     else:
         model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn,
-                filter_size=args.filter_size, gpu=GPU, trainable_emb = args.train_emb)
+                filter_num=args.filter_num, gpu=GPU, trainable_emb = args.train_emb)
         assert not args.rl, "SQLNet can\'t do reinforcement learning."
     optimizer = torch.optim.Adam(model.parameters(),
             lr=learning_rate, weight_decay = 0)

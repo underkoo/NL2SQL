@@ -7,7 +7,7 @@ import numpy as np
 from sqlnet.model.modules.net_utils import run_lstm, col_name_encode
 
 class SQLNetCondPredictor(nn.Module):
-    def __init__(self, N_word, N_h, N_depth, max_col_num, max_tok_num, use_ca, use_cnn, filter_size, gpu):
+    def __init__(self, N_word, N_h, N_depth, max_col_num, max_tok_num, use_ca, use_cnn, filter_num, gpu):
         super(SQLNetCondPredictor, self).__init__()
         self.N_h = N_h
         self.max_tok_num = max_tok_num
@@ -15,22 +15,22 @@ class SQLNetCondPredictor(nn.Module):
         self.gpu = gpu
         self.use_ca = use_ca
         self.use_cnn = use_cnn
-        self.filter_size = filter_size
+        self.filter_num = filter_num
 
         if use_cnn:
             self.cond_num_conv = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
                     in_channels=1,
-                    out_channels=self.filter_size,
+                    out_channels=self.filter_num,
                     kernel_size= (7, 100),
                     stride= (1, 1),
                     padding= (3, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
                 ),
-                nn.BatchNorm2d(self.filter_size),
+                nn.BatchNorm2d(self.filter_num),
                 nn.ReLU(),
                 nn.AdaptiveMaxPool2d((6, 1))
             )
-            self.cond_num_fc = nn.Linear(self.filter_size * 6 * 1, 5)
+            self.cond_num_fc = nn.Linear(self.filter_num * 6 * 1, 5)
         else:
 
             self.cond_num_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
@@ -50,12 +50,12 @@ class SQLNetCondPredictor(nn.Module):
         #     self.cond_col_conv = nn.Sequential(         # input shape (1, 28, 28)
         #         nn.Conv2d(
         #             in_channels=1,
-        #             out_channels=self.filter_size,
+        #             out_channels=self.filter_num,
         #             kernel_size= (7, 100),
         #             stride= (2, 1),
         #             padding= (2, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
         #         ),
-        #         nn.BatchNorm2d(self.filter_size),
+        #         nn.BatchNorm2d(self.filter_num),
         #         nn.ReLU(),
         #         nn.AdaptiveMaxPool2d((10, 1))
         #     )

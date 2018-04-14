@@ -9,25 +9,36 @@ from sqlnet.model.modules.net_utils import run_lstm, col_name_encode
 
 
 class AggPredictor(nn.Module):
-    def __init__(self, N_word, N_h, N_depth, use_ca, use_cnn, filter_size):
+    def __init__(self, N_word, N_h, N_depth, use_ca, use_cnn, filter_num):
         super(AggPredictor, self).__init__()
         self.use_ca = use_ca
         self.use_cnn = use_cnn
-        self.filter_size = filter_size
+        self.filter_num = filter_num
         if use_cnn:
             self.agg_conv = nn.Sequential(         # input shape (1, 28, 28)
                 nn.Conv2d(
                     in_channels=1,
-                    out_channels=self.filter_size,
+                    out_channels=self.filter_num,
                     kernel_size= (7, 100),
                     stride= (1, 1),
                     padding= (3, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
                 ),
-                nn.BatchNorm2d(self.filter_size),
-                nn.ReLU(),
-                nn.AdaptiveMaxPool2d((6, 1))
+                nn.BatchNorm2d(self.filter_num),
+                nn.Tanh()
             )
-            self.agg_fc = nn.Linear(self.filter_size * 6 * 1, 6)
+            if use_ca:
+                print ("Using column attention on aggregator predicting")
+                self.agg_col_name_enc = nn.LSTM(input_size=N_word,
+                        hidden_size=int(self.filter_num/2), num_layers=N_depth,
+                        batch_first=True, dropout=0.3, bidirectional=True)
+                self.agg_att = nn.Linear(self.filter_num, self.filter_num)
+                self.agg_out = nn.Sequential(nn.Linear(self.filter_num, self.filter_num),
+                    nn.Tanh(), nn.Linear(self.filter_num, 6))
+                self.softmax = nn.Softmax()
+            else:
+                print ("Not using column attention on aggregator predicting")    
+                self.agg_maxpool = nn.AdaptiveMaxPool2d((6, 1))
+                self.agg_fc = nn.Linear(self.filter_num * 6 * 1, 6)
         else:
             self.agg_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
                     num_layers=N_depth, batch_first=True,
@@ -49,13 +60,32 @@ class AggPredictor(nn.Module):
             col_len=None, col_num=None, gt_sel=None):
         if self.use_cnn:
             x_emb_var_dim = torch.unsqueeze(x_emb_var, dim=1)
-            # print(x_emb_var_dim)
             agg_conv_h = self.agg_conv(x_emb_var_dim)
-            # print(agg_conv_h)
-            agg_conv_h_dim = agg_conv_h.view(agg_conv_h.size(0), -1)
-            # print(agg_conv_h_dim)
-            agg_score = self.agg_fc(agg_conv_h_dim)
-            # print(agg_score)
+
+            if self.use_ca:
+                max_x_len = max(x_len)
+                agg_h = agg_conv_h.squeeze().transpose(1, 2)
+                e_col, _ = col_name_encode(col_inp_var, col_name_len, 
+                        col_len, self.agg_col_name_enc)
+                chosen_sel_idx = torch.LongTensor(gt_sel)
+                aux_range = torch.LongTensor(range(len(gt_sel)))
+                if x_emb_var.is_cuda:
+                    chosen_sel_idx = chosen_sel_idx.cuda()
+                    aux_range = aux_range.cuda()
+                chosen_e_col = e_col[aux_range, chosen_sel_idx]
+                att_val = torch.bmm(self.agg_att(agg_h), 
+                        chosen_e_col.unsqueeze(2)).squeeze()
+                for idx, num in enumerate(x_len):
+                    if num < max_x_len:
+                        att_val[idx, num:] = -100
+                att = self.softmax(att_val)
+                K_agg = (agg_h * att.unsqueeze(2).expand_as(agg_h)).sum(1)
+                agg_score = self.agg_out(K_agg)
+
+            else:
+                agg_conv_maxpool = self.agg_maxpool(agg_conv_h)
+                agg_conv_h_dim = agg_conv_maxpool.view(agg_conv_maxpool.size(0), -1)
+                agg_score = self.agg_fc(agg_conv_h_dim)
         else:
             B = len(x_emb_var)
             max_x_len = max(x_len)
