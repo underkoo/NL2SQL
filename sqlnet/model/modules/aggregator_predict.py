@@ -15,13 +15,13 @@ class AggPredictor(nn.Module):
         self.use_cnn = use_cnn
         self.filter_num = filter_num
         if use_cnn:
-            self.agg_conv = nn.Sequential(         # input shape (1, 28, 28)
+            self.agg_conv = nn.Sequential(
                 nn.Conv2d(
                     in_channels=1,
                     out_channels=self.filter_num,
-                    kernel_size= (7, 100),
+                    kernel_size= (7, N_word),
                     stride= (1, 1),
-                    padding= (3, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
+                    padding= (3, 0)
                 ),
                 nn.BatchNorm2d(self.filter_num),
                 nn.RReLU()
