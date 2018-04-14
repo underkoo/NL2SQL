@@ -24,7 +24,7 @@ class AggPredictor(nn.Module):
                     padding= (3, 0)
                 ),
                 nn.BatchNorm2d(self.filter_num),
-                nn.ReLU()
+                nn.RReLU()
             )
             self.agg_dropout = nn.Dropout2d(p=0.5)
             if use_ca:
