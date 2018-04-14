@@ -64,20 +64,19 @@ def load_dataset(dataset_id, use_small=False):
 
 def best_model_name(args, for_load=False):
     new_data = 'new' if args.dataset > 0 else 'old'
-    mode = 'seq2sql' if args.baseline else 'sqlnet'
+    mode = 'sqlnet'
     if for_load:
         use_emb = use_rl = ''
     else:
         use_emb = '_train_emb' if args.train_emb else ''
-        use_rl = 'rl_' if args.rl else ''
     use_ca = '_ca' if args.ca else ''
 
     agg_model_name = 'saved_model/%s_%s%s%s.agg_model'%(new_data,
             mode, use_emb, use_ca)
     sel_model_name = 'saved_model/%s_%s%s%s.sel_model'%(new_data,
             mode, use_emb, use_ca)
-    cond_model_name = 'saved_model/%s_%s%s%s.cond_%smodel'%(new_data,
-            mode, use_emb, use_ca, use_rl)
+    cond_model_name = 'saved_model/%s_%s%s%s.cond_model'%(new_data,
+            mode, use_emb, use_ca)
 
     if not for_load and args.train_emb:
         agg_embed_name = 'saved_model/%s_%s%s%s.agg_embed'%(new_data,
@@ -165,7 +164,7 @@ def epoch_train(model, optimizer, batch_size, sql_data, table_data, pred_entry):
 
     return cum_loss / len(sql_data)
 
-def epoch_exec_acc(model, batch_size, sql_data, table_data, db_path):
+def epoch_exec_acc(model, batch_size, sql_data, table_data, db_path, pred_entry):
     engine = DBEngine(db_path)
 
     model.eval()
@@ -183,9 +182,9 @@ def epoch_exec_acc(model, batch_size, sql_data, table_data, db_path):
         query_gt, table_ids = to_batch_query(sql_data, perm, st, ed)
         gt_sel_seq = [x[1] for x in ans_seq]
         score = model.forward(q_seq, col_seq, col_num,
-                (True, True, True), gt_sel=gt_sel_seq)
+                pred_entry, gt_sel=gt_sel_seq)
         pred_queries = model.gen_query(score, q_seq, col_seq,
-                raw_q_seq, raw_col_seq, (True, True, True))
+                raw_q_seq, raw_col_seq, pred_entry)
 
         for idx, (sql_gt, sql_pred, tid) in enumerate(
                 zip(query_gt, pred_queries, table_ids)):

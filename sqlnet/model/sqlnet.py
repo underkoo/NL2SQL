@@ -12,12 +12,15 @@ from sqlnet.model.modules.sqlnet_condition_predict import SQLNetCondPredictor
 
 class SQLNet(nn.Module):
     def __init__(self, word_emb, N_word, N_h=200, N_depth=2,
-            gpu=False, use_ca=True, use_cnn=False, filter_num=1, trainable_emb=False):
+            gpu=False, use_ca=True, use_cnn=False, filter_num=1, trainable_emb=False, agg=False, sel=False, cond=False):
         super(SQLNet, self).__init__()
         self.use_ca = use_ca
         self.use_cnn = use_cnn
         self.filter_num = filter_num
         self.trainable_emb = trainable_emb
+        self.agg = agg
+        self.sel = sel
+        self.cond = cond
 
         self.gpu = gpu
         self.N_h = N_h
@@ -42,14 +45,17 @@ class SQLNet(nn.Module):
                     self.SQL_TOK, our_model=True, trainable=trainable_emb)
         
         #Predict aggregator
-        self.agg_pred = AggPredictor(N_word, N_h, N_depth, use_ca=use_ca, use_cnn=use_cnn, filter_num=filter_num)
+        if agg:
+            self.agg_pred = AggPredictor(N_word, N_h, N_depth, use_ca=use_ca, use_cnn=use_cnn, filter_num=filter_num)
 
         #Predict selected column
-        self.sel_pred = SelPredictor(N_word, N_h, N_depth,
+        if sel:
+            self.sel_pred = SelPredictor(N_word, N_h, N_depth,
                 self.max_tok_num, use_ca=use_ca)
 
         #Predict number of cond
-        self.cond_pred = SQLNetCondPredictor(N_word, N_h, N_depth,
+        if cond:
+            self.cond_pred = SQLNetCondPredictor(N_word, N_h, N_depth,
                 self.max_col_num, self.max_tok_num, use_ca, use_cnn, filter_num, gpu)
 
 
@@ -309,7 +315,7 @@ class SQLNet(nn.Module):
             if not good:
                 tot_err += 1
 
-        return np.array((agg_err, sel_err, cond_err)), tot_err
+        return np.array((agg_err, sel_err, cond_err, cond_num_err, cond_col_err, cond_op_err, cond_val_err)), tot_err
 
     def check_error(self, vis_info, pred_queries, gt_queries, pred_entry):
         def pretty_print(vis_data):
@@ -331,29 +337,22 @@ class SQLNet(nn.Module):
         B = len(gt_queries)
 
         tot_err = agg_err = sel_err = cond_err = 0.0
-        agg_o_sel_x = agg_x_sel_o = 0.0
         cond_num_err = cond_col_err = cond_op_err = cond_val_err = 0.0
         agg_ops = ['None', 'MAX', 'MIN', 'COUNT', 'SUM', 'AVG']
 
         for b, (pred_qry, gt_qry) in enumerate(zip(pred_queries, gt_queries)):
             good = True
-            agg_pred = pred_qry['agg']
-            agg_gt = gt_qry['agg']
-            sel_pred = pred_qry['sel']
-            sel_gt = gt_qry['sel']
-
-            if agg_pred != agg_gt and sel_pred == sel_gt:
-                agg_x_sel_o += 1
-
-            if agg_pred == agg_gt and sel_pred != sel_gt:
-                agg_o_sel_x += 1
 
             if pred_agg:
+                agg_pred = pred_qry['agg']
+                agg_gt = gt_qry['agg']
                 if agg_pred != agg_gt:
                     agg_err += 1
                     good = False
 
             if pred_sel:
+                sel_pred = pred_qry['sel']
+                sel_gt = gt_qry['sel']
                 if sel_pred != sel_gt:
                     sel_err += 1
                     good = False
@@ -397,7 +396,7 @@ class SQLNet(nn.Module):
             if not good:
                 tot_err += 1
 
-        return np.array((agg_err, sel_err, cond_err, agg_x_sel_o, agg_o_sel_x, cond_num_err, cond_col_err, cond_op_err, cond_val_err)), tot_err
+        return np.array((agg_err, sel_err, cond_err, cond_num_err, cond_col_err, cond_op_err, cond_val_err)), tot_err
 
 
     def gen_query(self, score, q, col, raw_q, raw_col,

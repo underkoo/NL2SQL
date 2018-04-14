@@ -24,8 +24,9 @@ class AggPredictor(nn.Module):
                     padding= (3, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
                 ),
                 nn.BatchNorm2d(self.filter_num),
-                nn.Tanh()
+                nn.RReLU()
             )
+            self.agg_dropout = nn.Dropout2d(p=0.3)
             if use_ca:
                 print ("Using column attention on aggregator predicting")
                 self.agg_col_name_enc = nn.LSTM(input_size=N_word,
@@ -33,12 +34,14 @@ class AggPredictor(nn.Module):
                         batch_first=True, dropout=0.3, bidirectional=True)
                 self.agg_att = nn.Linear(self.filter_num, self.filter_num)
                 self.agg_out = nn.Sequential(nn.Linear(self.filter_num, self.filter_num),
-                    nn.Tanh(), nn.Linear(self.filter_num, 6))
+                    nn.RReLU(), nn.Linear(self.filter_num, 6))
                 self.softmax = nn.Softmax()
             else:
                 print ("Not using column attention on aggregator predicting")    
                 self.agg_maxpool = nn.AdaptiveMaxPool2d((6, 1))
-                self.agg_fc = nn.Linear(self.filter_num * 6 * 1, 6)
+                self.agg_fc = nn.Sequential(nn.Linear(self.filter_num, self.filter_num),
+                    nn.RReLU(), nn.Linear(self.filter_num, self.filter_num))
+                self.agg_out = nn.Linear(self.filter_num * 6 * 1, 6)
         else:
             self.agg_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
                     num_layers=N_depth, batch_first=True,
@@ -84,8 +87,10 @@ class AggPredictor(nn.Module):
 
             else:
                 agg_conv_maxpool = self.agg_maxpool(agg_conv_h)
-                agg_conv_h_dim = agg_conv_maxpool.view(agg_conv_maxpool.size(0), -1)
-                agg_score = self.agg_fc(agg_conv_h_dim)
+                agg_conv_dropped = self.agg_dropout(agg_conv_maxpool.squeeze().transpose(1, 2))
+                agg_h = self.agg_fc(agg_conv_dropped)
+                agg_h_dim = agg_h.view(agg_h.size(0), -1)
+                agg_score = self.agg_out(agg_h_dim)
         else:
             B = len(x_emb_var)
             max_x_len = max(x_len)
