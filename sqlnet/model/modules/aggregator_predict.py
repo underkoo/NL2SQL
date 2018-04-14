@@ -24,23 +24,24 @@ class AggPredictor(nn.Module):
                     padding= (3, 0)
                 ),
                 nn.BatchNorm2d(self.filter_num),
-                nn.RReLU()
+                nn.ReLU()
             )
-            self.agg_dropout = nn.Dropout2d(p=0.3)
+            self.agg_dropout = nn.Dropout2d(p=0.5)
             if use_ca:
                 print ("Using column attention on aggregator predicting")
                 self.agg_col_name_enc = nn.LSTM(input_size=N_word,
                         hidden_size=int(self.filter_num/2), num_layers=N_depth,
-                        batch_first=True, dropout=0.3, bidirectional=True)
-                self.agg_att = nn.Linear(self.filter_num, self.filter_num)
-                self.agg_out = nn.Sequential(nn.Linear(self.filter_num, self.filter_num),
-                    nn.RReLU(), nn.Linear(self.filter_num, 6))
+                        batch_first=True, dropout=0.5, bidirectional=True)
+                # self.agg_att = nn.Linear(self.filter_num, self.filter_num)
+                # self.agg_out = nn.Sequential(nn.Linear(self.filter_num, self.filter_num),
+                #     nn.ReLU(), nn.Linear(self.filter_num, 6))
+                self.agg_out = nn.Linear(self.filter_num, 6)
                 self.softmax = nn.Softmax()
             else:
                 print ("Not using column attention on aggregator predicting")    
                 self.agg_maxpool = nn.AdaptiveMaxPool2d((6, 1))
                 self.agg_fc = nn.Sequential(nn.Linear(self.filter_num, self.filter_num),
-                    nn.RReLU(), nn.Linear(self.filter_num, self.filter_num))
+                    nn.ReLU(), nn.Linear(self.filter_num, self.filter_num))
                 self.agg_out = nn.Linear(self.filter_num * 6 * 1, 6)
         else:
             self.agg_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
@@ -76,8 +77,9 @@ class AggPredictor(nn.Module):
                     chosen_sel_idx = chosen_sel_idx.cuda()
                     aux_range = aux_range.cuda()
                 chosen_e_col = e_col[aux_range, chosen_sel_idx]
-                att_val = torch.bmm(self.agg_att(agg_h), 
-                        chosen_e_col.unsqueeze(2)).squeeze()
+                # att_val = torch.bmm(self.agg_att(agg_h), 
+                #         chosen_e_col.unsqueeze(2)).squeeze()
+                att_val = torch.bmm(agg_h, chosen_e_col.unsqueeze(2)).squeeze()
                 for idx, num in enumerate(x_len):
                     if num < max_x_len:
                         att_val[idx, num:] = -100
