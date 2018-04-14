@@ -54,11 +54,11 @@ if __name__ == '__main__':
                     args.dataset, use_small=USE_SMALL)
 
     word_emb = load_word_emb('glove/glove.%dB.%dd.txt'%(B_word,N_word), \
-            load_used=args.train_emb, use_small=USE_SMALL)
+            load_used=False, use_small=USE_SMALL)
 
     
     model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn,
-            filter_num=args.filter_num, gpu=GPU, trainable_emb = args.train_emb, agg=args.agg, sel=args.sel, cond=args.cond)
+            filter_num=args.filter_num, gpu=GPU, trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond)
     optimizer = torch.optim.Adam(model.parameters(),
             lr=learning_rate, weight_decay = 0)
 

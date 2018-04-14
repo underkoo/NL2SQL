@@ -50,10 +50,10 @@ if __name__ == '__main__':
                     args.dataset, use_small=USE_SMALL)
 
     word_emb = load_word_emb('glove/glove.%dB.%dd.txt'%(B_word,N_word), \
-        load_used=True, use_small=USE_SMALL) # load_used can speed up loading
+        load_used=False, use_small=USE_SMALL) # load_used can speed up loading
 
     model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, filter_num=args.filter_num, gpu=GPU,
-                trainable_emb = True, agg=args.agg, sel=args.sel, cond=args.cond)
+                trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond)
 
     if args.train_emb:
         agg_m, sel_m, cond_m, agg_e, sel_e, cond_e = best_model_name(args)
