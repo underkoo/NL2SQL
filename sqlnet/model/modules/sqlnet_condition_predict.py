@@ -27,10 +27,13 @@ class SQLNetCondPredictor(nn.Module):
                     padding= (3, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
                 ),
                 nn.BatchNorm2d(self.filter_num),
-                nn.ReLU(),
-                nn.AdaptiveMaxPool2d((6, 1))
+                nn.RReLU()
             )
-            self.cond_num_fc = nn.Linear(self.filter_num * 6 * 1, 5)
+            self.cond_num_maxpool = nn.AdaptiveMaxPool2d((6, 1))
+            self.cond_num_dropout = nn.Dropout2d(p=0.5)
+            self.cond_num_fc = nn.Sequential(nn.Linear(self.filter_num, self.filter_num),
+                nn.ReLU(), nn.Linear(self.filter_num, self.filter_num))
+            self.cond_num_out = nn.Linear(self.filter_num * 6 * 1, 5)
         else:
 
             self.cond_num_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
@@ -159,10 +162,14 @@ class SQLNetCondPredictor(nn.Module):
 
         
         if self.use_cnn:
-            x_emb_var_num_dim = torch.unsqueeze(x_emb_var, dim=1)
-            cond_num_conv_h = self.cond_num_conv(x_emb_var_num_dim)
-            cond_num_conv_h_dim = cond_num_conv_h.view(cond_num_conv_h.size(0), -1)
-            cond_num_score = self.cond_num_fc(cond_num_conv_h_dim)
+            x_cond_num = torch.unsqueeze(x_emb_var, dim=1)
+            cond_num_conv_h = self.cond_num_conv(x_cond_num)
+            cond_num_conv_maxpool = self.cond_num_maxpool(cond_num_conv_h)
+            cond_num_conv_dropped = self.cond_num_dropout(cond_num_conv_maxpool.squeeze().transpose(1,2))
+            cond_num_h = self.cond_num_fc(cond_num_conv_dropped)
+            cond_num_h_dim = cond_num_h.view(cond_num_h.size(0), -1)
+            cond_num_score = self.cond_num_out(cond_num_h_dim)
+
         else:
             e_num_col, col_num = col_name_encode(col_inp_var, col_name_len,
                     col_len, self.cond_num_name_enc)
