@@ -22,7 +22,7 @@ class SQLNetCondPredictor(nn.Module):
                 nn.Conv2d(
                     in_channels=1,
                     out_channels=self.filter_num,
-                    kernel_size= (7, 100),
+                    kernel_size= (7, N_word),
                     stride= (1, 1),
                     padding= (3, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
                 ),
@@ -46,39 +46,45 @@ class SQLNetCondPredictor(nn.Module):
             self.cond_num_col2hid1 = nn.Linear(N_h, 2*N_h)
             self.cond_num_col2hid2 = nn.Linear(N_h, 2*N_h)
 
-        # if use_cnn:
-        #     self.cond_col_conv = nn.Sequential(         # input shape (1, 28, 28)
-        #         nn.Conv2d(
-        #             in_channels=1,
-        #             out_channels=self.filter_num,
-        #             kernel_size= (7, 100),
-        #             stride= (2, 1),
-        #             padding= (2, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
-        #         ),
-        #         nn.BatchNorm2d(self.filter_num),
-        #         nn.ReLU(),
-        #         nn.AdaptiveMaxPool2d((10, 1))
-        #     )
-        #     self.cond_col_relu = nn.Sequential( # fully connected layer  
-        #         nn.Dropout2d(p=0.3),
-        #         nn.ReLU()                      # activation
-        #     )
-        # else:
-        self.cond_col_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
-        if use_ca:
-            print ("Using column attention on where predicting")
-            self.cond_col_att = nn.Linear(N_h, N_h)
+        if use_cnn:
+            self.cond_col_conv = nn.Sequential(
+                nn.Conv2d(
+                    in_channels=1,
+                    out_channels=self.filter_num,
+                    kernel_size= (7, N_word),
+                    stride= (1, 1),
+                    padding= (3, 0)
+                ),
+                nn.BatchNorm2d(self.filter_num),
+                nn.RReLU()
+            )
+            self.cond_col_dropout = nn.Dropout2d(p=0.5)
+            self.cond_col_name_enc = nn.LSTM(input_size=N_word,
+                    hidden_size=int(self.filter_num/2), num_layers=N_depth,
+                    batch_first=True, dropout=0.5, bidirectional=True)
+            self.cond_col_att = nn.Linear(self.filter_num, 1)    
+
+
+            self.cond_col_out_K = nn.Linear(self.filter_num, self.filter_num)
+            self.cond_col_out_col = nn.Linear(self.filter_num, self.filter_num)
+            self.cond_col_out  = nn.Linear(self.filter_num, 1)
+            
         else:
-            print ("Not using column attention on where predicting")
-            self.cond_col_att = nn.Linear(N_h, 1)
-        self.cond_col_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
-        self.cond_col_out_K = nn.Linear(N_h, N_h)
-        self.cond_col_out_col = nn.Linear(N_h, N_h)
-        self.cond_col_out = nn.Sequential(nn.ReLU(), nn.Linear(N_h, 1))
+            self.cond_col_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
+                    num_layers=N_depth, batch_first=True,
+                    dropout=0.3, bidirectional=True)
+            if use_ca:
+                print ("Using column attention on where predicting")
+                self.cond_col_att = nn.Linear(N_h, N_h)
+            else:
+                print ("Not using column attention on where predicting")
+                self.cond_col_att = nn.Linear(N_h, 1)
+            self.cond_col_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
+                    num_layers=N_depth, batch_first=True,
+                    dropout=0.3, bidirectional=True)
+            self.cond_col_out_K = nn.Linear(N_h, N_h)
+            self.cond_col_out_col = nn.Linear(N_h, N_h)
+            self.cond_col_out = nn.Sequential(nn.ReLU(), nn.Linear(N_h, 1))
 
         self.cond_op_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
                 num_layers=N_depth, batch_first=True,
@@ -187,50 +193,52 @@ class SQLNetCondPredictor(nn.Module):
 
         #Predict the columns of conditions
 
-        # if self.use_cnn:
-        #     x_emb_var_col_dim = torch.unsqueeze(x_emb_var, dim=1)
-        #     cond_col_conv_h = self.cond_col_conv(x_emb_var_col_dim)
-        #     cond_col_conv_h_dim = cond_col_conv_h.view(cond_col_conv_h.size(0), -1)
-        #     print(cond_col_conv_h_dim)
-        #     cond_col_conv_h_resize = nn.Linear(cond_col_conv_h_dim, col_len)
-        #     print(cond_col_conv_h_resize)
-        #     cond_col_score = self.cond_col_dr(cond_col_conv_h_resize)
-        # else:
-        e_cond_col, _ = col_name_encode(col_inp_var, col_name_len, col_len,
-                self.cond_col_name_enc)
-
-        h_col_enc, _ = run_lstm(self.cond_col_lstm, x_emb_var, x_len)
-        # print('h_col_enc : ',h_col_enc)
-        if self.use_ca:
-            col_att_val = torch.bmm(e_cond_col,
-                    self.cond_col_att(h_col_enc).transpose(1, 2))
+        if self.use_cnn:
+            e_cond_col, _ = col_name_encode(col_inp_var, col_name_len, col_len, self.cond_col_name_enc)
+            x_cond_col = torch.unsqueeze(x_emb_var, dim=1)
+            cond_col_conv_h = self.cond_col_conv(x_cond_col)
+            cond_col_h = cond_col_conv_h.squeeze()
+            cond_col_att_val = torch.bmm(e_cond_col, cond_col_h)
             for idx, num in enumerate(x_len):
                 if num < max_x_len:
-                    col_att_val[idx, :, num:] = -100
-            col_att = self.softmax(col_att_val.view(
+                    cond_col_att_val[idx, :, num:] = -100
+            cond_col_att = self.softmax(cond_col_att_val.view(
                 (-1, np.asscalar(max_x_len)))).view(B, -1, np.asscalar(max_x_len))
-            K_cond_col = (h_col_enc.unsqueeze(1) * col_att.unsqueeze(3)).sum(2)
+            cond_col_val = (cond_col_h.transpose(1,2).unsqueeze(1) * cond_col_att.unsqueeze(3)).sum(2)
+            cond_col_score = self.cond_col_out(cond_col_val).squeeze()
+            max_col_num = max(col_num)
+            for b, num in enumerate(col_num):
+                if num < max_col_num:
+                    cond_col_score[b, num:] = -100
+                
         else:
-            col_att_val = self.cond_col_att(h_col_enc).squeeze()
-            for idx, num in enumerate(x_len):
-                if num < max_x_len:
-                    col_att_val[idx, num:] = -100
-            col_att = self.softmax(col_att_val)
-            K_cond_col = (h_col_enc *
-                    col_att_val.unsqueeze(2)).sum(1).unsqueeze(1)
-        # print('K_cond_col : ', K_cond_col)
-        # print('e_cond_col : ', e_cond_col)
-        # print('e_cond_col_size : ', e_cond_col.size(1))
-        # print('cond_col_out_K : ', self.cond_col_out_K(K_cond_col))
-        # print('cond_col_out_col : ',self.cond_col_out_col(e_cond_col))
-        # print('by adding', self.cond_col_out_K(K_cond_col) + self.cond_col_out_col(e_cond_col))
-        # print('cond_col_out : ', self.cond_col_out(self.cond_col_out_K(K_cond_col) + self.cond_col_out_col(e_cond_col)))
-        cond_col_score = self.cond_col_out(self.cond_col_out_K(K_cond_col) +
-                self.cond_col_out_col(e_cond_col)).squeeze()
-        max_col_num = max(col_num)
-        for b, num in enumerate(col_num):
-            if num < max_col_num:
-                cond_col_score[b, num:] = -100
+            e_cond_col, _ = col_name_encode(col_inp_var, col_name_len, col_len,
+                    self.cond_col_name_enc)
+
+            h_col_enc, _ = run_lstm(self.cond_col_lstm, x_emb_var, x_len)
+            if self.use_ca:
+                col_att_val = torch.bmm(e_cond_col,
+                        self.cond_col_att(h_col_enc).transpose(1, 2))
+                for idx, num in enumerate(x_len):
+                    if num < max_x_len:
+                        col_att_val[idx, :, num:] = -100
+                col_att = self.softmax(col_att_val.view(
+                    (-1, np.asscalar(max_x_len)))).view(B, -1, np.asscalar(max_x_len))
+                K_cond_col = (h_col_enc.unsqueeze(1) * col_att.unsqueeze(3)).sum(2)
+            else:
+                col_att_val = self.cond_col_att(h_col_enc).squeeze()
+                for idx, num in enumerate(x_len):
+                    if num < max_x_len:
+                        col_att_val[idx, num:] = -100
+                col_att = self.softmax(col_att_val)
+                K_cond_col = (h_col_enc *
+                        col_att_val.unsqueeze(2)).sum(1).unsqueeze(1)
+            cond_col_score = self.cond_col_out(self.cond_col_out_K(K_cond_col) +
+                    self.cond_col_out_col(e_cond_col)).squeeze()
+            max_col_num = max(col_num)
+            for b, num in enumerate(col_num):
+                if num < max_col_num:
+                    cond_col_score[b, num:] = -100
 
         #Predict the operator of conditions
         chosen_col_gt = []
