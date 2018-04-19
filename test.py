@@ -6,30 +6,11 @@ import numpy as np
 import datetime
 
 import argparse
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--toy', action='store_true', 
-            help='If set, use small data; used for fast debugging.')
-    parser.add_argument('--ca', action='store_true',
-            help='Use conditional attention.')
-    parser.add_argument('--dataset', type=int, default=0,
-            help='0: original dataset, 1: re-split dataset')
-    parser.add_argument('--train_emb', action='store_true',
-            help='Use trained word embedding for SQLNet.')
-    parser.add_argument('--cnn', action='store_true',
-            help='Use cnn for predicting num of where clause')
-    parser.add_argument('--filter_num', type=int, default=1,
-            help='1: defulat filter size')
-    parser.add_argument('--agg', action='store_true',
-            help='include agg')
-    parser.add_argument('--sel', action='store_true',
-            help='include sel')
-    parser.add_argument('--cond', action='store_true',
-            help='include cond')
-    args = parser.parse_args()
+import os
 
 
+
+def do_test(args):
     if args.toy:
         USE_SMALL=True
         GPU=True
@@ -44,10 +25,13 @@ if __name__ == '__main__':
         BATCH_SIZE=64
     TEST_ENTRY=(args.agg, args.sel, args.cond)  # (AGG, SEL, COND)
 
+    dataset = 1
+    # 0: original dataset, 1: re-split dataset
+
     sql_data, table_data, val_sql_data, val_table_data, \
             test_sql_data, test_table_data, \
             TRAIN_DB, DEV_DB, TEST_DB = load_dataset(
-                    args.dataset, use_small=USE_SMALL)
+                    dataset, use_small=USE_SMALL)
 
     word_emb = load_word_emb('glove/glove.%dB.%dd.txt'%(B_word,N_word), \
         load_used=False, use_small=USE_SMALL) # load_used can speed up loading
@@ -55,44 +39,96 @@ if __name__ == '__main__':
     model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, filter_num=args.filter_num, gpu=GPU,
                 trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond)
 
+    for i in range(100):
+        if args.toy:
+            if not os.path.isfile("result/toy_test%d.txt"%i):
+                result_file = open("result/toy_test%d.txt"%i, 'w')
+                break;
+        else:
+            if not os.path.isfile("result/real_test%d.txt"%i):
+                result_file = open("result/real_test%d.txt"%i, 'w')
+                break;
+
+    args_dic = vars(args)
+    for arg in args_dic:
+        result_file.write("%s = %s\n"%(arg, args_dic[arg]))
+
     if args.train_emb:
-        agg_m, sel_m, cond_m, agg_e, sel_e, cond_e = best_model_name(args)
+        agg_m, sel_m, cond_m, agg_e, sel_e, cond_e = best_model_name(dataset, args)
         if args.agg:
             print ("Loading from %s"%agg_m)
+            result_file.write("Loading from %s\n"%agg_m)
             model.agg_pred.load_state_dict(torch.load(agg_m))
             print ("Loading from %s"%agg_e)
+            result_file.write("Loading from %s\n"%agg_e)
             model.agg_embed_layer.load_state_dict(torch.load(agg_e))
         if args.sel:
             print ("Loading from %s"%sel_m)
+            result_file.write("Loading from %s\n"%sel_m)
             model.sel_pred.load_state_dict(torch.load(sel_m))
             print ("Loading from %s"%sel_e)
+            result_file.write("Loading from %s\n"%sel_e)
             model.sel_embed_layer.load_state_dict(torch.load(sel_e))
         if args.cond:
             print ("Loading from %s"%cond_m)
+            result_file.write("Loading from %s\n"%cond_m)
             model.cond_pred.load_state_dict(torch.load(cond_m))
             print ("Loading from %s"%cond_e)
+            result_file.write("Loading from %s\n"%cond_e)
             model.cond_embed_layer.load_state_dict(torch.load(cond_e))
     else:
-        agg_m, sel_m, cond_m = best_model_name(args)
+        agg_m, sel_m, cond_m = best_model_name(dataset, args)
         if args.agg:
             print ("Loading from %s"%agg_m)
+            result_file.write("Loading from %s\n"%agg_m)
             model.agg_pred.load_state_dict(torch.load(agg_m))
         if args.sel:
             print ("Loading from %s"%sel_m)
+            result_file.write("Loading from %s\n"%sel_m)
             model.sel_pred.load_state_dict(torch.load(sel_m))
         if args.cond:
             print ("Loading from %s"%cond_m)
+            result_file.write("Loading from %s\n"%cond_m)
             model.cond_pred.load_state_dict(torch.load(cond_m))
 
-    print ("Dev err num: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s"%epoch_error(
-            model, BATCH_SIZE, val_sql_data, val_table_data, TEST_ENTRY))
-    print ("Dev acc_qm: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val): %s"%epoch_acc(
-            model, BATCH_SIZE, val_sql_data, val_table_data, TEST_ENTRY))
-    print ("Dev execution acc: %s"%epoch_exec_acc(
-            model, BATCH_SIZE, val_sql_data, val_table_data, DEV_DB, TEST_ENTRY))
-    print ("Test err num: %s;  breakdown on\n (agg, sel, where, agg_x_sel_o, agg_o_sel_x, cond_num, cond_col, cond_op, cond_val):\n %s"%epoch_error(
-            model, BATCH_SIZE, test_sql_data, test_table_data, TEST_ENTRY))
-    print ("Test acc_qm: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val): %s"%epoch_acc(
-            model, BATCH_SIZE, test_sql_data, test_table_data, TEST_ENTRY))
-    print ("Test execution acc: %s"%epoch_exec_acc(
-            model, BATCH_SIZE, test_sql_data, test_table_data, TEST_DB, TEST_ENTRY))
+    val_err_num = epoch_error(model, BATCH_SIZE, val_sql_data, val_table_data, TEST_ENTRY)
+    print ("Dev err num: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s"%val_err_num)
+    result_file.write("Dev err num: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s\n"%val_err_num)
+    val_acc_qm = epoch_acc(model, BATCH_SIZE, val_sql_data, val_table_data, TEST_ENTRY)
+    print ("Dev acc_qm: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val): %s"%val_acc_qm)
+    result_file.write("Dev acc_qm: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val): %s\n"%val_acc_qm)
+    val_exec_acc = epoch_exec_acc(model, BATCH_SIZE, val_sql_data, val_table_data, DEV_DB, TEST_ENTRY)
+    print ("Dev execution acc: %s"%val_exec_acc)
+    result_file.write("Dev execution acc: %s\n"%val_exec_acc)
+    test_err_num = epoch_error(model, BATCH_SIZE, test_sql_data, test_table_data, TEST_ENTRY)
+    print ("Test err num: %s;  breakdown on\n (agg, sel, where, agg_x_sel_o, agg_o_sel_x, cond_num, cond_col, cond_op, cond_val):\n %s"%test_err_num)
+    result_file.write("Test err num: %s;  breakdown on\n (agg, sel, where, agg_x_sel_o, agg_o_sel_x, cond_num, cond_col, cond_op, cond_val):\n %s\n"%test_err_num)
+    test_acc_qm = epoch_acc(model, BATCH_SIZE, test_sql_data, test_table_data, TEST_ENTRY)
+    print ("Test acc_qm: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val): %s"%test_acc_qm)
+    result_file.write("Test acc_qm: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val): %s\n"%test_acc_qm)
+    test_exec_acc = epoch_exec_acc(model, BATCH_SIZE, test_sql_data, test_table_data, TEST_DB, TEST_ENTRY)
+    print ("Test execution acc: %s"%test_exec_acc)
+    result_file.write("Test execution acc: %s\n"%test_exec_acc)
+    result_file.close()
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--toy', action='store_true', 
+            help='If set, use small data; used for fast debugging.')
+    parser.add_argument('--ca', action='store_true',
+            help='Use conditional attention.')
+    parser.add_argument('--train_emb', action='store_true',
+            help='Use trained word embedding for SQLNet.')
+    parser.add_argument('--cnn', action='store_true',
+            help='Use cnn for predicting num of where clause')
+    parser.add_argument('--filter_num', type=int, default=1,
+            help='1: defulat filter size')
+    parser.add_argument('--agg', action='store_true',
+            help='include agg')
+    parser.add_argument('--sel', action='store_true',
+            help='include sel')
+    parser.add_argument('--cond', action='store_true',
+            help='include cond')
+    args = parser.parse_args()
+
+    do_test(args)

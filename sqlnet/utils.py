@@ -62,8 +62,8 @@ def load_dataset(dataset_id, use_small=False):
     return sql_data, table_data, val_sql_data, val_table_data,\
             test_sql_data, test_table_data, TRAIN_DB, DEV_DB, TEST_DB
 
-def best_model_name(args, for_load=False):
-    new_data = 'new' if args.dataset > 0 else 'old'
+def best_model_name(dataset, args, for_load=False):
+    new_data = 'new' if dataset > 0 else 'old'
     mode = 'sqlnet'
     if for_load:
         use_emb = use_rl = ''
