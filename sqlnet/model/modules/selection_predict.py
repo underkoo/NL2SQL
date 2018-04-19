@@ -62,5 +62,4 @@ class SelPredictor(nn.Module):
         for idx, num in enumerate(col_num):
             if num < max_col_num:
                 sel_score[idx, num:] = -100
-
         return sel_score
