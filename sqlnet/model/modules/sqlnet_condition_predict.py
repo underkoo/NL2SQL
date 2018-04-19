@@ -17,37 +17,37 @@ class SQLNetCondPredictor(nn.Module):
         self.use_cnn = use_cnn
         self.filter_num = filter_num
 
-        if use_cnn:
-            self.cond_num_conv = nn.Sequential(         # input shape (1, 28, 28)
-                nn.Conv2d(
-                    in_channels=1,
-                    out_channels=self.filter_num,
-                    kernel_size= (7, N_word),
-                    stride= (1, 1),
-                    padding= (3, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
-                ),
-                nn.BatchNorm2d(self.filter_num),
-                nn.RReLU()
-            )
-            self.cond_num_maxpool = nn.AdaptiveMaxPool2d((6, 1))
-            self.cond_num_dropout = nn.Dropout2d(p=0.5)
-            self.cond_num_fc = nn.Sequential(nn.Linear(self.filter_num, self.filter_num),
-                nn.ReLU(), nn.Linear(self.filter_num, self.filter_num))
-            self.cond_num_out = nn.Linear(self.filter_num * 6 * 1, 5)
-        else:
+        # if use_cnn:
+        #     self.cond_num_conv = nn.Sequential(         # input shape (1, 28, 28)
+        #         nn.Conv2d(
+        #             in_channels=1,
+        #             out_channels=self.filter_num,
+        #             kernel_size= (7, N_word),
+        #             stride= (1, 1),
+        #             padding= (3, 0)                 # if want same width and length of this image after con2d, padding=(kernel_size-1)/2 if stride=1
+        #         ),
+        #         nn.BatchNorm2d(self.filter_num),
+        #         nn.RReLU()
+        #     )
+        #     self.cond_num_maxpool = nn.AdaptiveMaxPool2d((6, 1))
+        #     self.cond_num_dropout = nn.Dropout2d(p=0.5)
+        #     self.cond_num_fc = nn.Sequential(nn.Linear(self.filter_num, self.filter_num),
+        #         nn.ReLU(), nn.Linear(self.filter_num, self.filter_num))
+        #     self.cond_num_out = nn.Linear(self.filter_num * 6 * 1, 5)
+        # else:
 
-            self.cond_num_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
-                    num_layers=N_depth, batch_first=True,
-                    dropout=0.3, bidirectional=True)
-            self.cond_num_att = nn.Linear(N_h, 1)
-            self.cond_num_out = nn.Sequential(nn.Linear(N_h, N_h),
-                    nn.Tanh(), nn.Linear(N_h, 5))
-            self.cond_num_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
-                    num_layers=N_depth, batch_first=True,
-                    dropout=0.3, bidirectional=True)
-            self.cond_num_col_att = nn.Linear(N_h, 1)
-            self.cond_num_col2hid1 = nn.Linear(N_h, 2*N_h)
-            self.cond_num_col2hid2 = nn.Linear(N_h, 2*N_h)
+        self.cond_num_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
+                num_layers=N_depth, batch_first=True,
+                dropout=0.3, bidirectional=True)
+        self.cond_num_att = nn.Linear(N_h, 1)
+        self.cond_num_out = nn.Sequential(nn.Linear(N_h, N_h),
+                nn.Tanh(), nn.Linear(N_h, 5))
+        self.cond_num_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
+                num_layers=N_depth, batch_first=True,
+                dropout=0.3, bidirectional=True)
+        self.cond_num_col_att = nn.Linear(N_h, 1)
+        self.cond_num_col2hid1 = nn.Linear(N_h, 2*N_h)
+        self.cond_num_col2hid2 = nn.Linear(N_h, 2*N_h)
 
         if use_cnn:
             self.cond_col_conv = nn.Sequential(
@@ -161,42 +161,42 @@ class SQLNetCondPredictor(nn.Module):
         # Then run the LSTM and predict condition number.
 
         
-        if self.use_cnn:
-            x_cond_num = torch.unsqueeze(x_emb_var, dim=1)
-            cond_num_conv_h = self.cond_num_conv(x_cond_num)
-            cond_num_conv_maxpool = self.cond_num_maxpool(cond_num_conv_h)
-            cond_num_conv_dropped = self.cond_num_dropout(cond_num_conv_maxpool.squeeze().transpose(1,2))
-            cond_num_h = self.cond_num_fc(cond_num_conv_dropped)
-            cond_num_h_dim = cond_num_h.view(cond_num_h.size(0), -1)
-            cond_num_score = self.cond_num_out(cond_num_h_dim)
+        # if self.use_cnn:
+        #     x_cond_num = torch.unsqueeze(x_emb_var, dim=1)
+        #     cond_num_conv_h = self.cond_num_conv(x_cond_num)
+        #     cond_num_conv_maxpool = self.cond_num_maxpool(cond_num_conv_h)
+        #     cond_num_conv_dropped = self.cond_num_dropout(cond_num_conv_maxpool.squeeze().transpose(1,2))
+        #     cond_num_h = self.cond_num_fc(cond_num_conv_dropped)
+        #     cond_num_h_dim = cond_num_h.view(cond_num_h.size(0), -1)
+        #     cond_num_score = self.cond_num_out(cond_num_h_dim)
 
-        else:
-            e_num_col, col_num = col_name_encode(col_inp_var, col_name_len,
-                    col_len, self.cond_num_name_enc)
-            num_col_att_val = self.cond_num_col_att(e_num_col).squeeze()
-            for idx, num in enumerate(col_num):
-                if num < max(col_num):
-                    num_col_att_val[idx, num:] = -100
-            num_col_att = self.softmax(num_col_att_val)
-            K_num_col = (e_num_col * num_col_att.unsqueeze(2)).sum(1)
-            cond_num_h1 = self.cond_num_col2hid1(K_num_col).view(
-                    B, 4, int(self.N_h/2)).transpose(0, 1).contiguous()
-            cond_num_h2 = self.cond_num_col2hid2(K_num_col).view(
-                    B, 4, int(self.N_h/2)).transpose(0, 1).contiguous()
+        # else:
+        e_num_col, col_num = col_name_encode(col_inp_var, col_name_len,
+                col_len, self.cond_num_name_enc)
+        num_col_att_val = self.cond_num_col_att(e_num_col).squeeze()
+        for idx, num in enumerate(col_num):
+            if num < max(col_num):
+                num_col_att_val[idx, num:] = -100
+        num_col_att = self.softmax(num_col_att_val)
+        K_num_col = (e_num_col * num_col_att.unsqueeze(2)).sum(1)
+        cond_num_h1 = self.cond_num_col2hid1(K_num_col).view(
+                B, 4, int(self.N_h/2)).transpose(0, 1).contiguous()
+        cond_num_h2 = self.cond_num_col2hid2(K_num_col).view(
+                B, 4, int(self.N_h/2)).transpose(0, 1).contiguous()
 
-            h_num_enc, _ = run_lstm(self.cond_num_lstm, x_emb_var, x_len,
-                    hidden=(cond_num_h1, cond_num_h2))
+        h_num_enc, _ = run_lstm(self.cond_num_lstm, x_emb_var, x_len,
+                hidden=(cond_num_h1, cond_num_h2))
 
-            num_att_val = self.cond_num_att(h_num_enc).squeeze()
+        num_att_val = self.cond_num_att(h_num_enc).squeeze()
 
-            for idx, num in enumerate(x_len):
-                if num < max_x_len:
-                    num_att_val[idx, num:] = -100
-            num_att = self.softmax(num_att_val)
+        for idx, num in enumerate(x_len):
+            if num < max_x_len:
+                num_att_val[idx, num:] = -100
+        num_att = self.softmax(num_att_val)
 
-            K_cond_num = (h_num_enc * num_att.unsqueeze(2).expand_as(
-                h_num_enc)).sum(1)
-            cond_num_score = self.cond_num_out(K_cond_num)
+        K_cond_num = (h_num_enc * num_att.unsqueeze(2).expand_as(
+            h_num_enc)).sum(1)
+        cond_num_score = self.cond_num_out(K_cond_num)
 
         #Predict the columns of conditions
 

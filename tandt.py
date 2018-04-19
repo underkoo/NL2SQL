@@ -22,6 +22,8 @@ if __name__ == '__main__':
             help='include sel')
     parser.add_argument('--cond', action='store_true',
             help='include cond')
+    parser.add_argument('--epoch', type=int, default=100,
+            help='100 : default epoch')
     args = parser.parse_args()
 
     do_train(args)

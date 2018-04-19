@@ -82,7 +82,7 @@ def do_train (args):
     best_agg_idx = 0
     best_sel_acc = init_acc[1][1]
     best_sel_idx = 0
-    best_cond_acc = 0.0
+    best_cond_acc = init_acc[1][2]
     best_cond_idx = 0
     print ('Init dev acc_qm: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s'%\
             init_acc)
@@ -101,8 +101,7 @@ def do_train (args):
         if args.train_emb:
             torch.save(model.cond_embed_layer.state_dict(), cond_e)
 
-    for i in range(11):
-    # for i in range(2):
+    for i in range(args.epoch):
         print ('Epoch %d @ %s'%(i+1, datetime.datetime.now()))
         result_file.write('Epoch %d @ %s\n'%(i+1, datetime.datetime.now()))
         loss = epoch_train(
@@ -146,8 +145,8 @@ def do_train (args):
                     'saved_model/epoch%d.sel_embed%s'%(i+1, args.suffix))
                     torch.save(model.sel_embed_layer.state_dict(), sel_e)
         if args.cond and TRAIN_COND:
-            if val_acc[1][4] > best_cond_acc:
-                best_cond_acc = val_acc[1][4]
+            if val_acc[1][2] > best_cond_acc:
+                best_cond_acc = val_acc[1][2]
                 best_cond_idx = i+1
                 torch.save(model.cond_pred.state_dict(),
                     'saved_model/epoch%d.cond_model%s'%(i+1, args.suffix))
@@ -185,6 +184,8 @@ if __name__ == '__main__':
             help='include sel')
     parser.add_argument('--cond', action='store_true',
             help='include cond')
+    parser.add_argument('--epoch', type=int, default=100,
+            help='100 : default epoch')
     args = parser.parse_args()
 
     do_train(args)
