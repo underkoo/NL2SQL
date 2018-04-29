@@ -51,7 +51,7 @@ class SQLNet(nn.Module):
         #Predict selected column
         if sel:
             self.sel_pred = SelPredictor(N_word, N_h, N_depth,
-                self.max_tok_num, use_ca=use_ca)
+                self.max_tok_num, use_ca=use_ca, use_cnn=use_cnn, filter_num=filter_num)
 
         #Predict number of cond
         if cond:
