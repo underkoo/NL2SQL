@@ -4,11 +4,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
-from sqlnet.model.modules.net_utils import run_lstm, col_name_encode
+from programs.model.modules.net_utils import run_lstm, col_name_encode
 
-class SQLNetCondPredictor(nn.Module):
+class CondPredictor(nn.Module):
     def __init__(self, N_word, N_h, N_depth, max_col_num, max_tok_num, use_ca, use_cnn, filter_num, gpu):
-        super(SQLNetCondPredictor, self).__init__()
+        super(CondPredictor, self).__init__()
         self.N_h = N_h
         self.max_tok_num = max_tok_num
         self.max_col_num = max_col_num

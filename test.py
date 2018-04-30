@@ -1,7 +1,7 @@
 import json
 import torch
-from sqlnet.utils import *
-from sqlnet.model.sqlnet import SQLNet
+from programs.utils import *
+from programs.model.predictor import Predictor
 import numpy as np
 import datetime
 
@@ -36,7 +36,7 @@ def do_test(args):
     word_emb = load_word_emb('glove/glove.%dB.%dd.txt'%(B_word,N_word), \
         load_used=False, use_small=USE_SMALL) # load_used can speed up loading
 
-    model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, filter_num=args.filter_num, gpu=GPU,
+    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, filter_num=args.filter_num, gpu=GPU,
                 trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond)
 
     for i in range(100):

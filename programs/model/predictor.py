@@ -4,16 +4,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
-from sqlnet.model.modules.word_embedding import WordEmbedding
-from sqlnet.model.modules.aggregator_predict import AggPredictor
-from sqlnet.model.modules.selection_predict import SelPredictor
-from sqlnet.model.modules.sqlnet_condition_predict import SQLNetCondPredictor
+from programs.model.modules.word_embedding import WordEmbedding
+from programs.model.modules.aggregator_predict import AggPredictor
+from programs.model.modules.selection_predict import SelPredictor
+from programs.model.modules.condition_predict import CondPredictor
 
 
-class SQLNet(nn.Module):
+class Predictor(nn.Module):
     def __init__(self, word_emb, N_word, N_h=200, N_depth=2,
             gpu=False, use_ca=True, use_cnn=False, filter_num=1, trainable_emb=False, agg=False, sel=False, cond=False):
-        super(SQLNet, self).__init__()
+        super(Predictor, self).__init__()
         self.use_ca = use_ca
         self.use_cnn = use_cnn
         self.filter_num = filter_num
@@ -55,7 +55,7 @@ class SQLNet(nn.Module):
 
         #Predict number of cond
         if cond:
-            self.cond_pred = SQLNetCondPredictor(N_word, N_h, N_depth,
+            self.cond_pred = CondPredictor(N_word, N_h, N_depth,
                 self.max_col_num, self.max_tok_num, use_ca, use_cnn, filter_num, gpu)
 
 
@@ -318,7 +318,7 @@ class SQLNet(nn.Module):
         return np.array((agg_err, sel_err, cond_err, cond_num_err, cond_col_err, cond_op_err, cond_val_err)), tot_err
 
 
-    def micro_cond_check_acc(self, vis_info, pred_queries, gt_queries, pred_entry):
+    def micro_cond_check_acc(self, vis_info, pred_queries, gt_queries):
         def pretty_print(vis_data):
             print ('question:', vis_data[0])
             print ('headers: (%s)'%(' || '.join(vis_data[1])))
@@ -332,8 +332,6 @@ class SQLNet(nn.Module):
                 cond_str.append(header[cond[0]] + ' ' +
                     self.COND_OPS[cond[1]] + ' ' + str(cond[2]).lower())
             return 'WHERE ' + ' AND '.join(cond_str)
-
-        pred_agg, pred_sel, pred_cond = pred_entry
 
         B = len(gt_queries)
 

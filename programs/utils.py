@@ -1,5 +1,5 @@
 import json
-from sqlnet.lib.dbengine import DBEngine
+from programs.lib.dbengine import DBEngine
 import re
 import numpy as np
 #from nltk.tokenize import StanfordTokenizer
@@ -64,7 +64,10 @@ def load_dataset(dataset_id, use_small=False):
 
 def best_model_name(dataset, args, for_load=False):
     new_data = 'new' if dataset > 0 else 'old'
-    mode = 'sqlnet'
+    if args.cnn:
+        mode = 'cnn'
+    else:
+        mode = 'sqlnet'
     if for_load:
         use_emb = use_rl = ''
     else:

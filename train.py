@@ -1,7 +1,7 @@
 import json
 import torch
-from sqlnet.utils import *
-from sqlnet.model.sqlnet import SQLNet
+from programs.utils import *
+from programs.model.predictor import Predictor
 import numpy as np
 import datetime
 
@@ -37,7 +37,7 @@ def do_train (args):
             load_used=False, use_small=USE_SMALL)
 
     
-    model = SQLNet(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn,
+    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn,
             filter_num=args.filter_num, gpu=GPU, trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond)
     optimizer = torch.optim.Adam(model.parameters(),
             lr=learning_rate, weight_decay = 0)
