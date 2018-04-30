@@ -317,6 +317,61 @@ class SQLNet(nn.Module):
 
         return np.array((agg_err, sel_err, cond_err, cond_num_err, cond_col_err, cond_op_err, cond_val_err)), tot_err
 
+
+    def micro_cond_check_acc(self, vis_info, pred_queries, gt_queries, pred_entry):
+        def pretty_print(vis_data):
+            print ('question:', vis_data[0])
+            print ('headers: (%s)'%(' || '.join(vis_data[1])))
+            print ('query:', vis_data[2])
+
+        def gen_cond_str(conds, header):
+            if len(conds) == 0:
+                return 'None'
+            cond_str = []
+            for cond in conds:
+                cond_str.append(header[cond[0]] + ' ' +
+                    self.COND_OPS[cond[1]] + ' ' + str(cond[2]).lower())
+            return 'WHERE ' + ' AND '.join(cond_str)
+
+        pred_agg, pred_sel, pred_cond = pred_entry
+
+        B = len(gt_queries)
+
+        cond_err = 0.0
+        real_con_num = 0.0
+
+        for b, (pred_qry, gt_qry) in enumerate(zip(pred_queries, gt_queries)):
+            cond_pred = pred_qry['conds']
+            cond_gt = gt_qry['conds']
+            real_con_num += len(cond_gt)
+            for i in range(len(cond_gt)):
+                flag = True
+                if flag and set(x[0] for x in cond_pred) != \
+                        set(x[0] for x in cond_gt):
+                    flag = False
+
+                for idx in range(len(cond_pred)):
+                    if not flag:
+                        break
+                    gt_idx = tuple(
+                            x[0] for x in cond_gt).index(cond_pred[idx][0])
+                    if flag and cond_gt[gt_idx][1] != cond_pred[idx][1]:
+                        flag = False
+
+                for idx in range(len(cond_pred)):
+                    if not flag:
+                        break
+                    gt_idx = tuple(
+                            x[0] for x in cond_gt).index(cond_pred[idx][0])
+                    if flag and str(cond_gt[gt_idx][2]).lower() != \
+                            str(cond_pred[idx][2]).lower():
+                        flag = False
+
+                if not flag:
+                    cond_err += 1
+
+        return cond_err, real_con_num
+
     def check_error(self, vis_info, pred_queries, gt_queries, pred_entry):
         def pretty_print(vis_data):
             print ('question:', vis_data[0])
