@@ -235,8 +235,7 @@ def micro_cond_epoch_acc(model, batch_size, sql_data, table_data, pred_entry):
     model.eval()
     perm = list(range(len(sql_data)))
     st = 0
-    one_acc_num = 0.0
-    tot_acc_num = 0.0
+    cond_acc_num = 0.0
     tot_cond_num = 0.0
     while st < len(sql_data):
         ed = st+batch_size if st+batch_size < len(perm) else len(perm)
@@ -250,14 +249,14 @@ def micro_cond_epoch_acc(model, batch_size, sql_data, table_data, pred_entry):
                 pred_entry, gt_sel = gt_sel_seq)
         pred_queries = model.gen_query(score, q_seq, col_seq,
                 raw_q_seq, raw_col_seq, pred_entry)
-        one_err, real_cond_num = model.micro_cond_check_acc(raw_data,
+        _cond_acc_num, _tot_cond_num = model.micro_cond_check_acc(raw_data,
                 pred_queries, query_gt)
 
-        one_acc_num += real_cond_num - one_err
-        tot_cond_num += real_cond_num
+        cond_acc_num += _cond_acc_num
+        tot_cond_num += _tot_cond_num
 
         st = ed
-    return tot_cond_num, one_acc_num, one_acc_num / tot_cond_num
+    return int(tot_cond_num), int(cond_acc_num), cond_acc_num / tot_cond_num
 
 def epoch_error(model, batch_size, sql_data, table_data, pred_entry):
     model.eval()

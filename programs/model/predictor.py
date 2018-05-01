@@ -335,40 +335,29 @@ class Predictor(nn.Module):
 
         B = len(gt_queries)
 
-        cond_err = 0.0
-        real_con_num = 0.0
+        cond_acc_num = 0.0
+        tot_cond_num = 0.0
 
         for b, (pred_qry, gt_qry) in enumerate(zip(pred_queries, gt_queries)):
-            cond_pred = pred_qry['conds']
             cond_gt = gt_qry['conds']
-            real_con_num += len(cond_gt)
-            for i in range(len(cond_gt)):
-                flag = True
-                if flag and set(x[0] for x in cond_pred) != \
-                        set(x[0] for x in cond_gt):
-                    flag = False
+            cond_pred = pred_qry['conds']
+            ordered_cols = [col[0] for col in cond_gt]
+            cond_gt_dict = {cond[0]:cond[1:] for cond in cond_gt}
+            cond_pred_dict = {cond[0]:cond[1:] for cond in cond_pred}
+            for col in sorted(ordered_cols):
+                if col in cond_pred_dict:
+                    cond_gt_item = cond_gt_dict[col]
+                    cond_pred_item = cond_pred_dict[col]
+                    cond_gt_item[1] = str(cond_gt_item[1]).lower()
+                    cond_pred_item[1] = str(cond_pred_item[1]).lower()
+                    if set(cond_gt_item) == set(cond_pred_item):
+                        cond_acc_num += 1
+                else:
+                    continue
+            tot_cond_num += len(cond_gt)
+            
 
-                for idx in range(len(cond_pred)):
-                    if not flag:
-                        break
-                    gt_idx = tuple(
-                            x[0] for x in cond_gt).index(cond_pred[idx][0])
-                    if flag and cond_gt[gt_idx][1] != cond_pred[idx][1]:
-                        flag = False
-
-                for idx in range(len(cond_pred)):
-                    if not flag:
-                        break
-                    gt_idx = tuple(
-                            x[0] for x in cond_gt).index(cond_pred[idx][0])
-                    if flag and str(cond_gt[gt_idx][2]).lower() != \
-                            str(cond_pred[idx][2]).lower():
-                        flag = False
-
-                if not flag:
-                    cond_err += 1
-
-        return cond_err, real_con_num
+        return cond_acc_num, tot_cond_num
 
     def check_error(self, vis_info, pred_queries, gt_queries, pred_entry):
         def pretty_print(vis_data):
