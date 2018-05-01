@@ -101,8 +101,8 @@ def do_test(args):
     print ("Dev execution acc: %s"%val_exec_acc)
     result_file.write("Dev execution acc: %s\n"%val_exec_acc)
     val_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, val_sql_data, val_table_data, TEST_ENTRY)
-    print ("Dev total cond num: %s, accurate cond num: %s, cond acc: %s"%val_micro_acc)
-    result_file.write("Dev total cond num: %s, accurate cond num: %s, cond acc: %s\n"%val_micro_acc)
+    print ("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%val_micro_acc)
+    result_file.write("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%val_micro_acc)
     test_err_num = epoch_error(model, BATCH_SIZE, test_sql_data, test_table_data, TEST_ENTRY)
     print ("Test err num: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s"%test_err_num)
     result_file.write("Test err num: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s\n"%test_err_num)
@@ -113,8 +113,8 @@ def do_test(args):
     print ("Test execution acc: %s"%test_exec_acc)
     result_file.write("Test execution acc: %s\n"%test_exec_acc)
     test_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, test_sql_data, test_table_data, TEST_ENTRY)
-    print ("Test total cond num: %s, accurate cond num: %s, cond acc: %s"%test_micro_acc)
-    result_file.write("Test total cond num: %s, accurate cond num: %s, cond acc: %s\n"%test_micro_acc)
+    print ("Test total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%test_micro_acc)
+    result_file.write("Test total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%test_micro_acc)
     result_file.close()
 
 if __name__ == '__main__':

@@ -145,16 +145,8 @@ def epoch_train(model, optimizer, batch_size, sql_data, table_data, pred_entry):
         ed = st+batch_size if st+batch_size < len(perm) else len(perm)
         q_seq, col_seq, col_num, ans_seq, query_seq, gt_cond_seq = \
                 to_batch_seq(sql_data, table_data, perm, st, ed)
-        # if ed == 15:
-        #     print(q_seq[0])
-        #     print(col_seq[0])
-        #     print(col_num[0])
-        #     print(ans_seq[0])
-        #     print(query_seq[0])
-        #     print(gt_cond_seq[0])
         gt_where_seq = model.generate_gt_where_seq(q_seq, col_seq, query_seq)
         gt_sel_seq = [x[1] for x in ans_seq]
-
         score = model.forward(q_seq, col_seq, col_num, pred_entry,
                 gt_where=gt_where_seq, gt_cond=gt_cond_seq, gt_sel=gt_sel_seq)
         loss = model.loss(score, ans_seq, pred_entry, gt_where_seq)
@@ -247,8 +239,8 @@ def micro_cond_epoch_acc(model, batch_size, sql_data, table_data, pred_entry):
         gt_sel_seq = [x[1] for x in ans_seq]
         score = model.forward(q_seq, col_seq, col_num,
                 pred_entry, gt_sel = gt_sel_seq)
-        pred_queries = model.gen_query(score, q_seq, col_seq,
-                raw_q_seq, raw_col_seq, pred_entry)
+        pred_queries = model.gen_exact_num_query(score, q_seq, col_seq,
+                raw_q_seq, raw_col_seq, query_gt)
         _cond_acc_num, _tot_cond_num = model.micro_cond_check_acc(raw_data,
                 pred_queries, query_gt)
 
@@ -256,7 +248,7 @@ def micro_cond_epoch_acc(model, batch_size, sql_data, table_data, pred_entry):
         tot_cond_num += _tot_cond_num
 
         st = ed
-    return int(tot_cond_num), int(cond_acc_num), cond_acc_num / tot_cond_num
+    return int(tot_cond_num), cond_acc_num, np.array((cond_acc_num[0] / tot_cond_num, cond_acc_num[1] / tot_cond_num, cond_acc_num[2] / cond_acc_num[1], cond_acc_num[3] / cond_acc_num[1]))
 
 def epoch_error(model, batch_size, sql_data, table_data, pred_entry):
     model.eval()

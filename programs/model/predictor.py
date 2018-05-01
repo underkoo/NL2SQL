@@ -91,6 +91,8 @@ class Predictor(nn.Module):
                 cur_values.append(cur_seq)
                 st = ed+1
             ret_seq.append(cur_values)
+        # 주어진 query에서 where 절이 어디부터 어디까지인지 나타내줌.
+        # AND로 나뉘면 나뉜만큼 나눠줌.
         return ret_seq
 
 
@@ -335,7 +337,7 @@ class Predictor(nn.Module):
 
         B = len(gt_queries)
 
-        cond_acc_num = 0.0
+        cond_acc = cond_col_acc = cond_op_acc = cond_val_acc = 0.0
         tot_cond_num = 0.0
 
         for b, (pred_qry, gt_qry) in enumerate(zip(pred_queries, gt_queries)):
@@ -345,19 +347,27 @@ class Predictor(nn.Module):
             cond_gt_dict = {cond[0]:cond[1:] for cond in cond_gt}
             cond_pred_dict = {cond[0]:cond[1:] for cond in cond_pred}
             for col in sorted(ordered_cols):
+                good = True
                 if col in cond_pred_dict:
+                    cond_col_acc += 1
                     cond_gt_item = cond_gt_dict[col]
                     cond_pred_item = cond_pred_dict[col]
-                    cond_gt_item[1] = str(cond_gt_item[1]).lower()
-                    cond_pred_item[1] = str(cond_pred_item[1]).lower()
-                    if set(cond_gt_item) == set(cond_pred_item):
-                        cond_acc_num += 1
+                    if cond_gt_item[0] == cond_pred_item[0]:
+                        cond_op_acc += 1
+                    else:
+                        good = False
+                    if str(cond_gt_item[1]).lower() == str(cond_pred_item[1]).lower():
+                        cond_val_acc += 1
+                    else:
+                        good = False
                 else:
-                    continue
+                    good = False
+                if good:
+                    cond_acc += 1
             tot_cond_num += len(cond_gt)
             
 
-        return cond_acc_num, tot_cond_num
+        return np.array((cond_acc, cond_col_acc, cond_op_acc, cond_val_acc)), tot_cond_num
 
     def check_error(self, vis_info, pred_queries, gt_queries, pred_entry):
         def pretty_print(vis_data):
@@ -515,6 +525,73 @@ class Predictor(nn.Module):
                         cur_cond_str_toks.append(str_val)
                     cur_cond.append(merge_tokens(cur_cond_str_toks, raw_q[b]))
                     cur_query['conds'].append(cur_cond)
+            ret_queries.append(cur_query)
+
+        return ret_queries
+
+    def gen_exact_num_query(self, score, q, col, raw_q, raw_col,
+            query_gt, reinforce=False, verbose=False):
+        def merge_tokens(tok_list, raw_tok_str):
+            tok_str = raw_tok_str.lower()
+            alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789$('
+            special = {'-LRB-':'(',
+                    '-RRB-':')',
+                    '-LSB-':'[',
+                    '-RSB-':']',
+                    '``':'"',
+                    '\'\'':'"',
+                    '--':u'\u2013'}
+            ret = ''
+            double_quote_appear = 0
+            for raw_tok in tok_list:
+                if not raw_tok:
+                    continue
+                tok = special.get(raw_tok, raw_tok)
+                if tok == '"':
+                    double_quote_appear = 1 - double_quote_appear
+
+                if len(ret) == 0:
+                    pass
+                elif len(ret) > 0 and ret + ' ' + tok in tok_str:
+                    ret = ret + ' '
+                elif len(ret) > 0 and ret + tok in tok_str:
+                    pass
+                elif tok == '"':
+                    if double_quote_appear:
+                        ret = ret + ' '
+                elif tok[0] not in alphabet:
+                    pass
+                elif (ret[-1] not in ['(', '/', u'\u2013', '#', '$', '&']) \
+                        and (ret[-1] != '"' or not double_quote_appear):
+                    ret = ret + ' '
+                ret = ret + tok
+            return ret.strip()
+
+        agg_score, sel_score, cond_score = score
+        
+        ret_queries = []
+        B = len(cond_score[0])
+        for b in range(B):
+            cur_query = {}
+            cur_query['conds'] = []
+            cond_num_score,cond_col_score,cond_op_score,cond_str_score =\
+                    [x.data.cpu().numpy() for x in cond_score]
+            cond_num = len(query_gt[b]['conds'])
+            all_toks = ['<BEG>'] + q[b] + ['<END>']
+            max_idxes = np.argsort(-cond_col_score[b])[:cond_num]
+            for idx in range(cond_num):
+                cur_cond = []
+                cur_cond.append(max_idxes[idx])
+                cur_cond.append(np.argmax(cond_op_score[b][idx]))
+                cur_cond_str_toks = []
+                for str_score in cond_str_score[b][idx]:
+                    str_tok = np.argmax(str_score[:len(all_toks)])
+                    str_val = all_toks[str_tok]
+                    if str_val == '<END>':
+                        break
+                    cur_cond_str_toks.append(str_val)
+                cur_cond.append(merge_tokens(cur_cond_str_toks, raw_q[b]))
+                cur_query['conds'].append(cur_cond)
             ret_queries.append(cur_query)
 
         return ret_queries
