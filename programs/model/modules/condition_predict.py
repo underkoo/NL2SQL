@@ -217,8 +217,6 @@ class CondPredictor(nn.Module):
         else:
             e_cond_col, _ = col_name_encode(col_inp_var, col_name_len, col_len,
                     self.cond_col_name_enc)
-            print(e_cond_col)
-
             h_col_enc, _ = run_lstm(self.cond_col_lstm, x_emb_var, x_len)
             if self.use_ca:
                 col_att_val = torch.bmm(e_cond_col,
