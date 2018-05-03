@@ -37,8 +37,8 @@ def do_train (args):
             load_used=False, use_small=USE_SMALL)
 
     
-    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn,
-            filter_num=args.filter_num, gpu=GPU, trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond)
+    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, use_col_cnn=args.col_cnn,
+            filter_num=args.filter_num, gpu=GPU, trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond, use_detach=args.detach)
     optimizer = torch.optim.Adam(model.parameters(),
             lr=learning_rate, weight_decay = 0)
 
@@ -176,6 +176,8 @@ if __name__ == '__main__':
             help='Train word embedding for SQLNet(requires pretrained model).')
     parser.add_argument('--cnn', action='store_true',
             help='Use cnn for predicting num of where clause')
+    parser.add_argument('--col_cnn', action='store_true',
+            help='apply cnn to column')
     parser.add_argument('--filter_num', type=int, default=1,
             help='1: defulat filter size')
     parser.add_argument('--agg', action='store_true',
@@ -184,6 +186,8 @@ if __name__ == '__main__':
             help='include sel')
     parser.add_argument('--cond', action='store_true',
             help='include cond')
+    parser.add_argument('--detach', action='store_true',
+            help='detach normal attention')
     parser.add_argument('--epoch', type=int, default=100,
             help='100 : default epoch')
     args = parser.parse_args()

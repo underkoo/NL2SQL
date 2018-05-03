@@ -45,3 +45,21 @@ def col_name_encode(name_inp_var, name_len, col_len, enc_lstm):
     ret_var = Variable(ret)
 
     return ret_var, col_len
+
+def cnn_col_name_encode(name_inp_var, name_len, col_len, enc_cnn, pooling_cnn):
+    #Encode the name of columns with CNN
+    name_convolutioned = enc_cnn(name_inp_var.unsqueeze(1))
+    name_pooled = pooling_cnn(name_convolutioned.squeeze())
+    name_out = name_pooled.squeeze()
+    ret = torch.FloatTensor(
+            len(col_len), np.asscalar(max(col_len)), name_out.size()[1]).zero_()
+    if name_out.is_cuda:
+        ret = ret.cuda()
+
+    st = 0
+    for idx, cur_len in enumerate(col_len):
+        ret[idx, :cur_len] = name_out.data[st:st+cur_len]
+        st += cur_len
+    ret_var = Variable(ret)
+
+    return ret_var, col_len
