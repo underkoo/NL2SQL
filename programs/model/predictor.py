@@ -12,7 +12,7 @@ from programs.model.modules.condition_predict import CondPredictor
 
 class Predictor(nn.Module):
     def __init__(self, word_emb, N_word, N_h=200, N_depth=2,
-            gpu=True, use_ca=True, use_cnn=False, use_col_cnn=False, filter_num=1, trainable_emb=False, agg=False, sel=False, cond=False, use_detach=False):
+            gpu=False, use_ca=True, use_cnn=False, use_col_cnn=False, filter_num=1, trainable_emb=False, agg=False, sel=False, cond=False, use_detach=False):
         super(Predictor, self).__init__()
         self.use_ca = use_ca
         self.use_cnn = use_cnn
