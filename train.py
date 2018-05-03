@@ -117,11 +117,18 @@ def do_train (args):
         #     print (' Dev err num: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s'% val_err_num)
         #     result_file.write(' Dev err num: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s\n'% val_err_num)
         if i % 10 == 0:
+            train_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, sql_data, table_data, TRAIN_ENTRY)
+            print ("Train total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%train_micro_acc)
+            result_file.write("Train total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%train_micro_acc)
             train_acc_qm = epoch_acc(model, BATCH_SIZE, sql_data, table_data, TRAIN_ENTRY)
-            print (' Train acc_qm: %s   breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s'% train_acc_qm)
+            print ('Train acc_qm: %s   breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s'% train_acc_qm)
             result_file.write(' Train acc_qm: %s   breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s\n'% train_acc_qm)
+            val_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, val_sql_data, val_table_data, TRAIN_ENTRY)
+            print ("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%val_micro_acc)
+            result_file.write("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%val_micro_acc)
+
         val_acc = epoch_acc(model, BATCH_SIZE, val_sql_data, val_table_data, TRAIN_ENTRY)
-        print (' Dev acc_qm: %s   breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s'%val_acc)
+        print ('Dev acc_qm: %s   breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s'%val_acc)
         result_file.write(' Dev acc_qm: %s   breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s\n'%val_acc)
         if args.agg and TRAIN_AGG:
             if val_acc[1][0] > best_agg_acc:
