@@ -7,7 +7,7 @@ import numpy as np
 from programs.model.modules.net_utils import run_lstm, col_name_encode, cnn_col_name_encode
 
 class CondPredictor(nn.Module):
-    def __init__(self, N_word, N_h, N_depth, max_col_num, max_tok_num, use_ca, use_cnn, use_col_cnn, filter_num, use_detach, gpu):
+    def __init__(self, N_word, N_h, N_depth, max_col_num, max_tok_num, use_ca, use_cnn, use_col_cnn, filter_num, cnn_type, use_detach, gpu):
         super(CondPredictor, self).__init__()
         self.N_h = N_h
         self.max_tok_num = max_tok_num
@@ -17,6 +17,7 @@ class CondPredictor(nn.Module):
         self.use_cnn = use_cnn
         self.use_col_cnn = use_col_cnn
         self.filter_num = filter_num
+        self.cnn_type = cnn_type
         self.use_detach = use_detach
 
         self.cond_num_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
@@ -44,6 +45,31 @@ class CondPredictor(nn.Module):
                 nn.BatchNorm2d(filter_num),
                 nn.RReLU()
             )
+            if cnn_type == 2 or cnn_type == 3:
+                self.cond_col_conv2 = nn.Sequential(
+                    nn.Conv2d(
+                        in_channels=1,
+                        out_channels=filter_num,
+                        kernel_size= (3, N_word),
+                        stride= (1, 1),
+                        padding= (1, 0)
+                    ),
+                    nn.BatchNorm2d(filter_num),
+                    nn.RReLU()
+                )
+                if cnn_type == 3:
+                    self.cond_col_conv3 = nn.Sequential(
+                        nn.Conv2d(
+                            in_channels=1,
+                            out_channels=filter_num,
+                            kernel_size= (5, N_word),
+                            stride= (1, 1),
+                            padding= (2, 0)
+                        ),
+                        nn.BatchNorm2d(filter_num),
+                        nn.RReLU()
+                    )
+
             self.cond_col_dropout = nn.Dropout2d(p=0.5)
             if use_col_cnn:
                 self.cnn_cond_col_name_enc = nn.Sequential(
@@ -203,6 +229,35 @@ class CondPredictor(nn.Module):
                     cond_col_att_val[idx, :, num:] = -100
             cond_col_att = self.softmax(cond_col_att_val.view(
                 (-1, np.asscalar(max_x_len)))).view(B, -1, np.asscalar(max_x_len))
+
+            print("cond_col_h", cond_col_h)
+            print("cond_col_att", cond_col_att)
+            if self.cnn_type == 2 or self.cnn_type == 3:
+                cond_col_conv_h2 = self.cond_col_conv2(x_cond_col)
+                cond_col_h2 = cond_col_conv_h2.squeeze()
+                cond_col_att_val2 = torch.bmm(e_cond_col, cond_col_h2)
+                for idx, num in enumerate(x_len):
+                    if num < max_x_len:
+                        cond_col_att_val2[idx, :, num:] = -100
+                cond_col_att2 = self.softmax(cond_col_att_val2.view(
+                    (-1, np.asscalar(max_x_len)))).view(B, -1, np.asscalar(max_x_len))
+                cond_col_h = torch.cat((cond_col_h, cond_col_h2), 2)
+                cond_col_att = torch.cat((cond_col_att, cond_col_att2), 2)
+                print("cond_col_h", cond_col_h)
+                print("cond_col_att", cond_col_att)
+                if self.cnn_type == 3:
+                    cond_col_conv_h3 = self.cond_col_conv3(x_cond_col)
+                    cond_col_h3 = cond_col_conv_h3.squeeze()
+                    cond_col_att_val3 = torch.bmm(e_cond_col, cond_col_h3)
+                    for idx, num in enumerate(x_len):
+                        if num < max_x_len:
+                            cond_col_att_val3[idx, :, num:] = -100
+                    cond_col_att3 = self.softmax(cond_col_att_val3.view(
+                        (-1, np.asscalar(max_x_len)))).view(B, -1, np.asscalar(max_x_len))
+                    cond_col_h = torch.cat((cond_col_h, cond_col_h3), 2)
+                    cond_col_att = torch.cat((cond_col_att, cond_col_att3), 2)
+                    print("cond_col_h", cond_col_h)
+                    print("cond_col_att", cond_col_att)
             cond_col_val = (cond_col_h.transpose(1,2).unsqueeze(1) * cond_col_att.unsqueeze(3)).sum(2)
             if self.use_detach:
                 cond_col_score = self.cond_col_out(cond_col_val).squeeze()

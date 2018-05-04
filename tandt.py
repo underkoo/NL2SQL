@@ -18,6 +18,8 @@ if __name__ == '__main__':
             help='apply cnn to column')
     parser.add_argument('--filter_num', type=int, default=1,
             help='1: defulat filter size')
+    parser.add_argument('--cnn_type', type=int, default=1,
+            help='1: filter_size 7, 2: filter_size 3 and 7, 3: filter_size 3, 5 and 7')
     parser.add_argument('--agg', action='store_true',
             help='include agg')
     parser.add_argument('--sel', action='store_true',
