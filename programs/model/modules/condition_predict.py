@@ -229,9 +229,6 @@ class CondPredictor(nn.Module):
                     cond_col_att_val[idx, :, num:] = -100
             cond_col_att = self.softmax(cond_col_att_val.view(
                 (-1, np.asscalar(max_x_len)))).view(B, -1, np.asscalar(max_x_len))
-
-            print("cond_col_h", cond_col_h)
-            print("cond_col_att", cond_col_att)
             if self.cnn_type == 2 or self.cnn_type == 3:
                 cond_col_conv_h2 = self.cond_col_conv2(x_cond_col)
                 cond_col_h2 = cond_col_conv_h2.squeeze()
@@ -243,8 +240,6 @@ class CondPredictor(nn.Module):
                     (-1, np.asscalar(max_x_len)))).view(B, -1, np.asscalar(max_x_len))
                 cond_col_h = torch.cat((cond_col_h, cond_col_h2), 2)
                 cond_col_att = torch.cat((cond_col_att, cond_col_att2), 2)
-                print("cond_col_h", cond_col_h)
-                print("cond_col_att", cond_col_att)
                 if self.cnn_type == 3:
                     cond_col_conv_h3 = self.cond_col_conv3(x_cond_col)
                     cond_col_h3 = cond_col_conv_h3.squeeze()
@@ -256,8 +251,6 @@ class CondPredictor(nn.Module):
                         (-1, np.asscalar(max_x_len)))).view(B, -1, np.asscalar(max_x_len))
                     cond_col_h = torch.cat((cond_col_h, cond_col_h3), 2)
                     cond_col_att = torch.cat((cond_col_att, cond_col_att3), 2)
-                    print("cond_col_h", cond_col_h)
-                    print("cond_col_att", cond_col_att)
             cond_col_val = (cond_col_h.transpose(1,2).unsqueeze(1) * cond_col_att.unsqueeze(3)).sum(2)
             if self.use_detach:
                 cond_col_score = self.cond_col_out(cond_col_val).squeeze()
