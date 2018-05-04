@@ -36,7 +36,7 @@ def do_test(args):
     word_emb = load_word_emb('glove/glove.%dB.%dd.txt'%(B_word,N_word), \
         load_used=False, use_small=USE_SMALL) # load_used can speed up loading
 
-    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, use_col_cnn=args.col_cnn, filter_num=args.filter_num, gpu=GPU,
+    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, use_col_cnn=args.col_cnn, filter_num=args.filter_num, cnn_type=args.cnn_type, gpu=GPU,
                 trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond, use_detach=args.detach)
 
     for i in range(100):
@@ -131,6 +131,8 @@ if __name__ == '__main__':
             help='apply cnn to column')
     parser.add_argument('--filter_num', type=int, default=1,
             help='1: defulat filter size')
+    parser.add_argument('--cnn_type', type=int, default=1,
+            help='1: filter_size 7, 2: filter_size 3 and 7, 3: filter_size 3, 5 and 7')
     parser.add_argument('--agg', action='store_true',
             help='include agg')
     parser.add_argument('--sel', action='store_true',
