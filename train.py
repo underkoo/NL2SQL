@@ -37,7 +37,7 @@ def do_train (args):
             load_used=False, use_small=USE_SMALL)
 
     
-    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, use_col_cnn=args.col_cnn,
+    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, use_col_cnn=args.col_cnn, use_op_cnn=args.op_cnn,
             filter_num=args.filter_num, cnn_type=args.cnn_type, gpu=GPU, trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond, use_detach=args.detach)
     optimizer = torch.optim.Adam(model.parameters(),
             lr=learning_rate, weight_decay = 0)
@@ -186,6 +186,8 @@ if __name__ == '__main__':
             help='Use cnn for predicting num of where clause')
     parser.add_argument('--col_cnn', action='store_true',
             help='apply cnn to column')
+    parser.add_argument('--op_cnn', action='store_true',
+            help='apply cnn to operator')
     parser.add_argument('--filter_num', type=int, default=1,
             help='1: defulat filter size')
     parser.add_argument('--cnn_type', type=int, default=1,

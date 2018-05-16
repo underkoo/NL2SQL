@@ -16,6 +16,8 @@ if __name__ == '__main__':
             help='Use cnn for predicting num of where clause')
     parser.add_argument('--col_cnn', action='store_true',
             help='apply cnn to column')
+    parser.add_argument('--op_cnn', action='store_true',
+            help='apply cnn to operator')
     parser.add_argument('--filter_num', type=int, default=1,
             help='1: defulat filter size')
     parser.add_argument('--cnn_type', type=int, default=1,

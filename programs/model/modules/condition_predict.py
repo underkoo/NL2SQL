@@ -7,7 +7,7 @@ import numpy as np
 from programs.model.modules.net_utils import run_lstm, col_name_encode, cnn_col_name_encode
 
 class CondPredictor(nn.Module):
-    def __init__(self, N_word, N_h, N_depth, max_col_num, max_tok_num, use_ca, use_cnn, use_col_cnn, filter_num, cnn_type, use_detach, gpu):
+    def __init__(self, N_word, N_h, N_depth, max_col_num, max_tok_num, use_ca, use_cnn, use_col_cnn, use_op_cnn, filter_num, cnn_type, use_detach, gpu):
         super(CondPredictor, self).__init__()
         self.N_h = N_h
         self.max_tok_num = max_tok_num
@@ -16,6 +16,7 @@ class CondPredictor(nn.Module):
         self.use_ca = use_ca
         self.use_cnn = use_cnn
         self.use_col_cnn = use_col_cnn
+        self.use_op_cnn = use_op_cnn
         self.filter_num = filter_num
         self.cnn_type = cnn_type
         self.use_detach = use_detach
@@ -119,20 +120,41 @@ class CondPredictor(nn.Module):
             else:
                 self.cond_col_out = nn.Sequential(nn.ReLU(), nn.Linear(N_h, 1))
 
-        self.cond_op_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
-        if use_ca:
-            self.cond_op_att = nn.Linear(N_h, N_h)
+        if use_op_cnn:
+            self.cond_op_conv = nn.Sequential(
+                nn.Conv2d(
+                    in_channels=1,
+                    out_channels=filter_num,
+                    kernel_size= (5, N_word),
+                    stride= (1, 1),
+                    padding= (2, 0)
+                ),
+                nn.BatchNorm2d(filter_num),
+                nn.RReLU()
+            )
+            self.cond_op_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(filter_num/2),
+                    num_layers=N_depth, batch_first=True,
+                    dropout=0.3, bidirectional=True)
+            if use_ca:
+                self.cond_op_att = nn.Linear(filter_num, filter_num)
+            else:
+                self.cond_op_att = nn.Linear(filter_num, 1)
+            self.cond_op_out_K = nn.Linear(filter_num, filter_num)
+            self.cond_op_out_col = nn.Linear(filter_num, filter_num)
+            self.cond_op_out = nn.Sequential(nn.Linear(filter_num, filter_num), nn.Tanh(),
+                    nn.Linear(filter_num, 3))
         else:
-            self.cond_op_att = nn.Linear(N_h, 1)
-        self.cond_op_out_K = nn.Linear(N_h, N_h)
-        self.cond_op_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
-        self.cond_op_out_col = nn.Linear(N_h, N_h)
-        self.cond_op_out = nn.Sequential(nn.Linear(N_h, N_h), nn.Tanh(),
-                nn.Linear(N_h, 3))
+            self.cond_op_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
+                    num_layers=N_depth, batch_first=True,
+                    dropout=0.3, bidirectional=True)
+            self.cond_op_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
+                    num_layers=N_depth, batch_first=True,
+                    dropout=0.3, bidirectional=True)    
+            self.cond_op_att = nn.Linear(N_h, N_h)
+            self.cond_op_out_K = nn.Linear(N_h, N_h)
+            self.cond_op_out_col = nn.Linear(N_h, N_h)
+            self.cond_op_out = nn.Sequential(nn.Linear(N_h, N_h), nn.Tanh(),
+                    nn.Linear(N_h, 3))
 
         self.cond_str_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
                 num_layers=N_depth, batch_first=True,
@@ -314,7 +336,12 @@ class CondPredictor(nn.Module):
             col_emb.append(cur_col_emb)
         col_emb = torch.stack(col_emb)
 
-        h_op_enc, _ = run_lstm(self.cond_op_lstm, x_emb_var, x_len)
+        if self.use_op_cnn:
+            x_cond_op = torch.unsqueeze(x_emb_var, dim=1)
+            cond_op_conv_h = self.cond_op_conv(x_cond_op)
+            h_op_enc = cond_op_conv_h.squeeze().transpose(1, 2)
+        else:
+            h_op_enc, _ = run_lstm(self.cond_op_lstm, x_emb_var, x_len)
         if self.use_ca:
             op_att_val = torch.matmul(self.cond_op_att(h_op_enc).unsqueeze(1),
                     col_emb.unsqueeze(3)).squeeze()

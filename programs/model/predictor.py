@@ -12,11 +12,12 @@ from programs.model.modules.condition_predict import CondPredictor
 
 class Predictor(nn.Module):
     def __init__(self, word_emb, N_word, N_h=200, N_depth=2,
-            gpu=False, use_ca=True, use_cnn=False, use_col_cnn=False, filter_num=1, cnn_type=1, trainable_emb=False, agg=False, sel=False, cond=False, use_detach=False):
+            gpu=False, use_ca=True, use_cnn=False, use_col_cnn=False, use_op_cnn=False, filter_num=1, cnn_type=1, trainable_emb=False, agg=False, sel=False, cond=False, use_detach=False):
         super(Predictor, self).__init__()
         self.use_ca = use_ca
         self.use_cnn = use_cnn
         self.use_col_cnn = use_col_cnn
+        self.use_op_cnn = use_op_cnn
         self.filter_num = filter_num
         self.trainable_emb = trainable_emb
         self.agg = agg
@@ -58,7 +59,7 @@ class Predictor(nn.Module):
         #Predict number of cond
         if cond:
             self.cond_pred = CondPredictor(N_word, N_h, N_depth,
-                self.max_col_num, self.max_tok_num, use_ca=use_ca, use_cnn=use_cnn, use_col_cnn=use_col_cnn, filter_num=filter_num, cnn_type=cnn_type, use_detach=use_detach, gpu=gpu)
+                self.max_col_num, self.max_tok_num, use_ca=use_ca, use_cnn=use_cnn, use_col_cnn=use_col_cnn, use_op_cnn=use_op_cnn, filter_num=filter_num, cnn_type=cnn_type, use_detach=use_detach, gpu=gpu)
 
 
         self.CE = nn.CrossEntropyLoss()
