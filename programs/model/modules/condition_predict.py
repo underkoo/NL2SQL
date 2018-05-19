@@ -7,7 +7,7 @@ import numpy as np
 from programs.model.modules.net_utils import run_lstm, col_name_encode, cnn_col_name_encode
 
 class CondPredictor(nn.Module):
-    def __init__(self, N_word, N_h, N_depth, max_col_num, max_tok_num, use_ca, use_cnn, use_col_cnn, use_op_cnn, filter_num, cnn_type, use_detach, gpu):
+    def __init__(self, N_word, N_h, N_depth, max_col_num, max_tok_num, use_ca, use_cnn, use_col_cnn, use_num_cnn, use_op_cnn, filter_num, cnn_type, use_detach, gpu):
         super(CondPredictor, self).__init__()
         self.N_h = N_h
         self.max_tok_num = max_tok_num
@@ -15,24 +15,46 @@ class CondPredictor(nn.Module):
         self.gpu = gpu
         self.use_ca = use_ca
         self.use_cnn = use_cnn
+        self.use_num_cnn = use_num_cnn
         self.use_col_cnn = use_col_cnn
         self.use_op_cnn = use_op_cnn
         self.filter_num = filter_num
         self.cnn_type = cnn_type
         self.use_detach = use_detach
 
-        self.cond_num_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
-        self.cond_num_att = nn.Linear(N_h, 1)
-        self.cond_num_out = nn.Sequential(nn.Linear(N_h, N_h),
-                nn.Tanh(), nn.Linear(N_h, 5))
-        self.cond_num_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
-        self.cond_num_col_att = nn.Linear(N_h, 1)
-        self.cond_num_col2hid1 = nn.Linear(N_h, 2*N_h)
-        self.cond_num_col2hid2 = nn.Linear(N_h, 2*N_h)
+        if use_num_cnn:
+            self.cond_num_conv = nn.Sequential(
+                nn.Conv2d(
+                    in_channels=1,
+                    out_channels=filter_num,
+                    kernel_size= (5, N_word),
+                    stride= (1, 1),
+                    padding= (2, 0)
+                ),
+                nn.BatchNorm2d(filter_num),
+                nn.RReLU()
+            )
+            self.cond_num_att = nn.Linear(filter_num, 1)
+            self.cond_num_col_att = nn.Linear(filter_num, 1)
+            self.cond_num_out = nn.Sequential(nn.Linear(filter_num, filter_num),
+                    nn.Tanh(), nn.Linear(filter_num, 5))
+            self.cond_num_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(filter_num/2),
+                    num_layers=N_depth, batch_first=True,
+                    dropout=0.3, bidirectional=True)
+
+        else:
+            self.cond_num_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
+                    num_layers=N_depth, batch_first=True,
+                    dropout=0.3, bidirectional=True)
+            self.cond_num_att = nn.Linear(N_h, 1)
+            self.cond_num_out = nn.Sequential(nn.Linear(N_h, N_h),
+                    nn.Tanh(), nn.Linear(N_h, 5))
+            self.cond_num_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
+                    num_layers=N_depth, batch_first=True,
+                    dropout=0.3, bidirectional=True)
+            self.cond_num_col_att = nn.Linear(N_h, 1)
+            self.cond_num_col2hid1 = nn.Linear(N_h, 2*N_h)
+            self.cond_num_col2hid2 = nn.Linear(N_h, 2*N_h)
 
         if use_cnn:
             self.cond_col_conv = nn.Sequential(
@@ -210,19 +232,25 @@ class CondPredictor(nn.Module):
 
         e_num_col, col_num = col_name_encode(col_inp_var, col_name_len,
                 col_len, self.cond_num_name_enc)
+
         num_col_att_val = self.cond_num_col_att(e_num_col).squeeze()
         for idx, num in enumerate(col_num):
             if num < max(col_num):
                 num_col_att_val[idx, num:] = -100
         num_col_att = self.softmax(num_col_att_val)
         K_num_col = (e_num_col * num_col_att.unsqueeze(2)).sum(1)
-        cond_num_h1 = self.cond_num_col2hid1(K_num_col).view(
-                B, 4, int(self.N_h/2)).transpose(0, 1).contiguous()
-        cond_num_h2 = self.cond_num_col2hid2(K_num_col).view(
-                B, 4, int(self.N_h/2)).transpose(0, 1).contiguous()
+        
+        if self.use_num_cnn:
+            x_cond_num = torch.unsqueeze(x_emb_var, dim=1)
+            h_num_enc = self.cond_num_conv(x_cond_num).transpose(1,2).squeeze()
+        else:
+            cond_num_h1 = self.cond_num_col2hid1(K_num_col).view(
+                    B, 4, int(self.N_h/2)).transpose(0, 1).contiguous()
+            cond_num_h2 = self.cond_num_col2hid2(K_num_col).view(
+                    B, 4, int(self.N_h/2)).transpose(0, 1).contiguous()
 
-        h_num_enc, _ = run_lstm(self.cond_num_lstm, x_emb_var, x_len,
-                hidden=(cond_num_h1, cond_num_h2))
+            h_num_enc, _ = run_lstm(self.cond_num_lstm, x_emb_var, x_len,
+                    hidden=(cond_num_h1, cond_num_h2))
 
         num_att_val = self.cond_num_att(h_num_enc).squeeze()
 
@@ -230,7 +258,6 @@ class CondPredictor(nn.Module):
             if num < max_x_len:
                 num_att_val[idx, num:] = -100
         num_att = self.softmax(num_att_val)
-
         K_cond_num = (h_num_enc * num_att.unsqueeze(2).expand_as(
             h_num_enc)).sum(1)
         cond_num_score = self.cond_num_out(K_cond_num)
