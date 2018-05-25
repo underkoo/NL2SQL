@@ -7,7 +7,7 @@ import numpy as np
 from programs.model.modules.net_utils import run_lstm, col_name_encode, cnn_col_name_encode
 
 class CondPredictor(nn.Module):
-    def __init__(self, N_word, N_h, N_depth, max_col_num, max_tok_num, use_ca, use_cnn, use_col_cnn, use_num_cnn, use_op_cnn, filter_num, cnn_type, use_detach, gpu):
+    def __init__(self, N_word, N_h, N_depth, max_col_num, max_tok_num, use_ca, use_cnn, use_col_cnn, use_num_cnn, use_op_cnn, use_val_cnn, filter_num, cnn_type, use_detach, gpu):
         super(CondPredictor, self).__init__()
         self.N_h = N_h
         self.max_tok_num = max_tok_num
@@ -18,6 +18,7 @@ class CondPredictor(nn.Module):
         self.use_num_cnn = use_num_cnn
         self.use_col_cnn = use_col_cnn
         self.use_op_cnn = use_op_cnn
+        self.use_val_cnn = use_val_cnn
         self.filter_num = filter_num
         self.cnn_type = cnn_type
         self.use_detach = use_detach
@@ -178,19 +179,42 @@ class CondPredictor(nn.Module):
             self.cond_op_out = nn.Sequential(nn.Linear(N_h, N_h), nn.Tanh(),
                     nn.Linear(N_h, 3))
 
-        self.cond_str_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
-        self.cond_str_decoder = nn.LSTM(input_size=self.max_tok_num,
-                hidden_size=N_h, num_layers=N_depth,
-                batch_first=True, dropout=0.3)
-        self.cond_str_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
-                num_layers=N_depth, batch_first=True,
-                dropout=0.3, bidirectional=True)
-        self.cond_str_out_g = nn.Linear(N_h, N_h)
-        self.cond_str_out_h = nn.Linear(N_h, N_h)
-        self.cond_str_out_col = nn.Linear(N_h, N_h)
-        self.cond_str_out = nn.Sequential(nn.ReLU(), nn.Linear(N_h, 1))
+        if use_val_cnn:
+            self.cond_str_conv = nn.Sequential(
+                nn.Conv2d(
+                    in_channels=1,
+                    out_channels=filter_num,
+                    kernel_size= (5, N_word),
+                    stride= (1, 1),
+                    padding= (2, 0)
+                ),
+                nn.BatchNorm2d(filter_num),
+                nn.RReLU()
+            )
+            self.cond_str_decoder = nn.LSTM(input_size=self.max_tok_num,
+                    hidden_size=filter_num, num_layers=N_depth,
+                    batch_first=True, dropout=0.3)
+            self.cond_str_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(filter_num/2),
+                    num_layers=N_depth, batch_first=True,
+                    dropout=0.3, bidirectional=True)
+            self.cond_str_out_g = nn.Linear(filter_num, filter_num)
+            self.cond_str_out_h = nn.Linear(filter_num, filter_num)
+            self.cond_str_out_col = nn.Linear(filter_num, filter_num)
+            self.cond_str_out = nn.Sequential(nn.ReLU(), nn.Linear(filter_num, 1))
+        else:
+            self.cond_str_lstm = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
+                    num_layers=N_depth, batch_first=True,
+                    dropout=0.3, bidirectional=True)
+            self.cond_str_decoder = nn.LSTM(input_size=self.max_tok_num,
+                    hidden_size=N_h, num_layers=N_depth,
+                    batch_first=True, dropout=0.3)
+            self.cond_str_name_enc = nn.LSTM(input_size=N_word, hidden_size=int(N_h/2),
+                    num_layers=N_depth, batch_first=True,
+                    dropout=0.3, bidirectional=True)
+            self.cond_str_out_g = nn.Linear(N_h, N_h)
+            self.cond_str_out_h = nn.Linear(N_h, N_h)
+            self.cond_str_out_col = nn.Linear(N_h, N_h)
+            self.cond_str_out = nn.Sequential(nn.ReLU(), nn.Linear(N_h, 1))
 
         self.softmax = nn.Softmax()
 
@@ -389,7 +413,12 @@ class CondPredictor(nn.Module):
                 self.cond_op_out_col(col_emb)).squeeze()
 
         #Predict the string of conditions
-        h_str_enc, _ = run_lstm(self.cond_str_lstm, x_emb_var, x_len)
+        if self.use_val_cnn:
+            x_cond_str = torch.unsqueeze(x_emb_var, dim=1)
+            cond_str_conv_h = self.cond_str_conv(x_cond_str)
+            h_str_enc = cond_str_conv_h.squeeze().transpose(1, 2)
+        else:
+            h_str_enc, _ = run_lstm(self.cond_str_lstm, x_emb_var, x_len)
         e_cond_col, _ = col_name_encode(col_inp_var, col_name_len,
                 col_len, self.cond_str_name_enc)
         col_emb = []
@@ -404,7 +433,10 @@ class CondPredictor(nn.Module):
             gt_tok_seq, gt_tok_len = self.gen_gt_batch(gt_where)
             g_str_s_flat, _ = self.cond_str_decoder(
                     gt_tok_seq.view(B*4, -1, self.max_tok_num))
-            g_str_s = g_str_s_flat.contiguous().view(B, 4, -1, self.N_h)
+            if self.use_val_cnn:
+                g_str_s = g_str_s_flat.contiguous().view(B, 4, -1, self.filter_num)
+            else:
+                g_str_s = g_str_s_flat.contiguous().view(B, 4, -1, self.N_h)
 
             h_ext = h_str_enc.unsqueeze(1).unsqueeze(1)
             g_ext = g_str_s.unsqueeze(3)
@@ -434,7 +466,11 @@ class CondPredictor(nn.Module):
                     g_str_s_flat, cur_h = self.cond_str_decoder(cur_inp, cur_h)
                 else:
                     g_str_s_flat, cur_h = self.cond_str_decoder(cur_inp)
-                g_str_s = g_str_s_flat.view(B, 4, 1, self.N_h)
+
+                if self.use_val_cnn:
+                    g_str_s = g_str_s_flat.view(B, 4, 1, self.filter_num)
+                else:
+                    g_str_s = g_str_s_flat.view(B, 4, 1, self.N_h)
                 g_ext = g_str_s.unsqueeze(3)
 
                 cur_cond_str_score = self.cond_str_out(

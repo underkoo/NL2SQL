@@ -36,7 +36,7 @@ def do_test(args):
     word_emb = load_word_emb('glove/glove.%dB.%dd.txt'%(B_word,N_word), \
         load_used=False, use_small=USE_SMALL) # load_used can speed up loading
 
-    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, use_col_cnn=args.col_cnn, use_num_cnn=args.num_cnn, use_op_cnn=args.op_cnn, filter_num=args.filter_num, cnn_type=args.cnn_type, gpu=GPU,
+    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, use_col_cnn=args.col_cnn, use_num_cnn=args.num_cnn, use_op_cnn=args.op_cnn, use_val_cnn=args.val_cnn, filter_num=args.filter_num, cnn_type=args.cnn_type, gpu=GPU,
                 trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond, use_detach=args.detach)
 
     for i in range(100):
@@ -133,6 +133,8 @@ if __name__ == '__main__':
             help='apply cnn to the number of columns')
     parser.add_argument('--op_cnn', action='store_true',
             help='apply cnn to operator')
+    parser.add_argument('--val_cnn', action='store_true',
+            help='apply cnn to value')
     parser.add_argument('--filter_num', type=int, default=1,
             help='1: defulat filter size')
     parser.add_argument('--cnn_type', type=int, default=1,
