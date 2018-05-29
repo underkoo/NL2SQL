@@ -7,13 +7,13 @@ import numpy as np
 from programs.model.modules.net_utils import run_lstm, col_name_encode
 
 class SelPredictor(nn.Module):
-    def __init__(self, N_word, N_h, N_depth, max_tok_num, use_ca, use_cnn, filter_num):
+    def __init__(self, N_word, N_h, N_depth, max_tok_num, use_ca, use_sel_cnn, filter_num):
         super(SelPredictor, self).__init__()
         self.use_ca = use_ca
-        self.use_cnn = use_cnn
+        self.use_sel_cnn = use_sel_cnn
         self.filter_num = filter_num
         self.max_tok_num = max_tok_num
-        if use_cnn:
+        if use_sel_cnn:
             self.sel_conv = nn.Sequential(
                 nn.Conv2d(
                     in_channels=1,
@@ -60,7 +60,7 @@ class SelPredictor(nn.Module):
         B = len(x_emb_var)
         max_x_len = max(x_len)
 
-        if self.use_cnn:
+        if self.use_sel_cnn:
             e_cond_col, _ = col_name_encode(col_inp_var, col_name_len, col_len, self.sel_name_enc)
             x_cond_col = torch.unsqueeze(x_emb_var, dim=1)
             sel_conv_h = self.sel_conv(x_cond_col)

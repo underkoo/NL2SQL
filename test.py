@@ -36,7 +36,7 @@ def do_test(args):
     word_emb = load_word_emb('glove/glove.%dB.%dd.txt'%(B_word,N_word), \
         load_used=False, use_small=USE_SMALL) # load_used can speed up loading
 
-    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, use_col_cnn=args.col_cnn, use_num_cnn=args.num_cnn, use_op_cnn=args.op_cnn, use_val_cnn=args.val_cnn, filter_num=args.filter_num, cnn_type=args.cnn_type, gpu=GPU,
+    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, use_col_cnn=args.col_cnn, use_num_cnn=args.num_cnn, use_op_cnn=args.op_cnn, use_val_cnn=args.val_cnn, use_agg_cnn=args.agg_cnn, use_sel_cnn=args.sel_cnn, filter_num=args.filter_num, cnn_type=args.cnn_type, gpu=GPU,
                 trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond, use_detach=args.detach)
 
     for i in range(100):
@@ -100,9 +100,9 @@ def do_test(args):
     val_exec_acc = epoch_exec_acc(model, BATCH_SIZE, val_sql_data, val_table_data, DEV_DB, TEST_ENTRY)
     print ("Dev execution acc: %s"%val_exec_acc)
     result_file.write("Dev execution acc: %s\n"%val_exec_acc)
-    val_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, val_sql_data, val_table_data, TEST_ENTRY)
-    print ("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%val_micro_acc)
-    result_file.write("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%val_micro_acc)
+    # val_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, val_sql_data, val_table_data, TEST_ENTRY)
+    # print ("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%val_micro_acc)
+    # result_file.write("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%val_micro_acc)
     test_err_num = epoch_error(model, BATCH_SIZE, test_sql_data, test_table_data, TEST_ENTRY)
     print ("Test err num: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s"%test_err_num)
     result_file.write("Test err num: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s\n"%test_err_num)
@@ -112,9 +112,9 @@ def do_test(args):
     test_exec_acc = epoch_exec_acc(model, BATCH_SIZE, test_sql_data, test_table_data, TEST_DB, TEST_ENTRY)
     print ("Test execution acc: %s"%test_exec_acc)
     result_file.write("Test execution acc: %s\n"%test_exec_acc)
-    test_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, test_sql_data, test_table_data, TEST_ENTRY)
-    print ("Test total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%test_micro_acc)
-    result_file.write("Test total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%test_micro_acc)
+    # test_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, test_sql_data, test_table_data, TEST_ENTRY)
+    # print ("Test total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%test_micro_acc)
+    # result_file.write("Test total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%test_micro_acc)
     result_file.close()
 
 if __name__ == '__main__':
@@ -135,6 +135,10 @@ if __name__ == '__main__':
             help='apply cnn to operator')
     parser.add_argument('--val_cnn', action='store_true',
             help='apply cnn to value')
+    parser.add_argument('--agg_cnn', action='store_true',
+            help='apply cnn to aggregator')
+    parser.add_argument('--sel_cnn', action='store_true',
+            help='apply cnn to sel')
     parser.add_argument('--filter_num', type=int, default=1,
             help='1: defulat filter size')
     parser.add_argument('--cnn_type', type=int, default=1,

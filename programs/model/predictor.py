@@ -12,7 +12,7 @@ from programs.model.modules.condition_predict import CondPredictor
 
 class Predictor(nn.Module):
     def __init__(self, word_emb, N_word, N_h=200, N_depth=2,
-            gpu=False, use_ca=True, use_cnn=False, use_num_cnn=False, use_col_cnn=False, use_op_cnn=False, use_val_cnn=False, filter_num=1, cnn_type=1, trainable_emb=False, agg=False, sel=False, cond=False, use_detach=False):
+            gpu=False, use_ca=True, use_cnn=False, use_num_cnn=False, use_col_cnn=False, use_op_cnn=False, use_val_cnn=False, use_agg_cnn=False, use_sel_cnn=False, filter_num=1, cnn_type=1, trainable_emb=False, agg=False, sel=False, cond=False, use_detach=False):
         super(Predictor, self).__init__()
         self.use_ca = use_ca
         self.use_cnn = use_cnn
@@ -20,6 +20,8 @@ class Predictor(nn.Module):
         self.use_col_cnn = use_col_cnn
         self.use_op_cnn = use_op_cnn
         self.use_val_cnn = use_val_cnn
+        self.use_agg_cnn = use_agg_cnn
+        self.use_sel_cnn = use_sel_cnn
         self.filter_num = filter_num
         self.trainable_emb = trainable_emb
         self.agg = agg
@@ -51,12 +53,12 @@ class Predictor(nn.Module):
         
         #Predict aggregator
         if agg:
-            self.agg_pred = AggPredictor(N_word, N_h, N_depth, use_ca=use_ca, use_cnn=use_cnn, filter_num=filter_num)
+            self.agg_pred = AggPredictor(N_word, N_h, N_depth, use_ca=use_ca, use_agg_cnn=use_agg_cnn, filter_num=filter_num)
 
         #Predict selected column
         if sel:
             self.sel_pred = SelPredictor(N_word, N_h, N_depth,
-                self.max_tok_num, use_ca=use_ca, use_cnn=use_cnn, filter_num=filter_num)
+                self.max_tok_num, use_ca=use_ca, use_sel_cnn=use_sel_cnn, filter_num=filter_num)
 
         #Predict number of cond
         if cond:

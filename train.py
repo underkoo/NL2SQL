@@ -37,7 +37,7 @@ def do_train (args):
             load_used=False, use_small=USE_SMALL)
 
     
-    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, use_col_cnn=args.col_cnn, use_num_cnn=args.num_cnn, use_op_cnn=args.op_cnn, use_val_cnn=args.val_cnn,
+    model = Predictor(word_emb, N_word=N_word, use_ca=args.ca, use_cnn=args.cnn, use_col_cnn=args.col_cnn, use_num_cnn=args.num_cnn, use_op_cnn=args.op_cnn, use_val_cnn=args.val_cnn, use_agg_cnn=args.agg_cnn, use_sel_cnn=args.sel_cnn,
             filter_num=args.filter_num, cnn_type=args.cnn_type, gpu=GPU, trainable_emb = False, agg=args.agg, sel=args.sel, cond=args.cond, use_detach=args.detach)
     optimizer = torch.optim.Adam(model.parameters(),
             lr=learning_rate, weight_decay = 0)
@@ -117,15 +117,15 @@ def do_train (args):
         #     print (' Dev err num: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s'% val_err_num)
         #     result_file.write(' Dev err num: %s;  breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s\n'% val_err_num)
         if i % 10 == 0:
-            train_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, sql_data, table_data, TRAIN_ENTRY)
-            print ("Train total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%train_micro_acc)
-            result_file.write("Train total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%train_micro_acc)
+            # train_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, sql_data, table_data, TRAIN_ENTRY)
+            # print ("Train total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%train_micro_acc)
+            # result_file.write("Train total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%train_micro_acc)
             train_acc_qm = epoch_acc(model, BATCH_SIZE, sql_data, table_data, TRAIN_ENTRY)
             print ('Train acc_qm: %s   breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s'% train_acc_qm)
             result_file.write(' Train acc_qm: %s   breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s\n'% train_acc_qm)
-            val_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, val_sql_data, val_table_data, TRAIN_ENTRY)
-            print ("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%val_micro_acc)
-            result_file.write("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%val_micro_acc)
+            # val_micro_acc = micro_cond_epoch_acc(model, BATCH_SIZE, val_sql_data, val_table_data, TRAIN_ENTRY)
+            # print ("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s"%val_micro_acc)
+            # result_file.write("Dev total cond num: %s\n accurate cond num breakdown on\n(cond_acc, cond_col, cond_op, cond_val):\n %s\n cond accuracy breakdowon on\n (cond_acc, cond_col, cond_op, cond_val):\n %s\n"%val_micro_acc)
 
         val_acc = epoch_acc(model, BATCH_SIZE, val_sql_data, val_table_data, TRAIN_ENTRY)
         print ('Dev acc_qm: %s   breakdown on\n (agg, sel, where, cond_num, cond_col, cond_op, cond_val):\n %s'%val_acc)
@@ -192,6 +192,10 @@ if __name__ == '__main__':
             help='apply cnn to operator')
     parser.add_argument('--val_cnn', action='store_true',
             help='apply cnn to value')
+    parser.add_argument('--agg_cnn', action='store_true',
+            help='apply cnn to aggregator')
+    parser.add_argument('--sel_cnn', action='store_true',
+            help='apply cnn to sel')
     parser.add_argument('--filter_num', type=int, default=1,
             help='1: defulat filter size')
     parser.add_argument('--cnn_type', type=int, default=1,

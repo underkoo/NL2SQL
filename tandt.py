@@ -22,6 +22,10 @@ if __name__ == '__main__':
             help='apply cnn to operator')
     parser.add_argument('--val_cnn', action='store_true',
             help='apply cnn to value')
+    parser.add_argument('--agg_cnn', action='store_true',
+            help='apply cnn to aggregator')
+    parser.add_argument('--sel_cnn', action='store_true',
+            help='apply cnn to sel')
     parser.add_argument('--filter_num', type=int, default=1,
             help='1: defulat filter size')
     parser.add_argument('--cnn_type', type=int, default=1,

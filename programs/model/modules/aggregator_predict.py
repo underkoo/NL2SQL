@@ -9,12 +9,12 @@ from programs.model.modules.net_utils import run_lstm, col_name_encode
 
 
 class AggPredictor(nn.Module):
-    def __init__(self, N_word, N_h, N_depth, use_ca, use_cnn, filter_num):
+    def __init__(self, N_word, N_h, N_depth, use_ca, use_agg_cnn, filter_num):
         super(AggPredictor, self).__init__()
         self.use_ca = use_ca
-        self.use_cnn = use_cnn
+        self.use_agg_cnn = use_agg_cnn
         self.filter_num = filter_num
-        if use_cnn:
+        if use_agg_cnn:
             self.agg_conv = nn.Sequential(
                 nn.Conv2d(
                     in_channels=1,
@@ -62,7 +62,7 @@ class AggPredictor(nn.Module):
 
     def forward(self, x_emb_var, x_len, col_inp_var=None, col_name_len=None,
             col_len=None, col_num=None, gt_sel=None):
-        if self.use_cnn:
+        if self.use_agg_cnn:
             x_emb_var_dim = torch.unsqueeze(x_emb_var, dim=1)
             agg_conv_h = self.agg_conv(x_emb_var_dim)
 
